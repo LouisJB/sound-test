@@ -1,3 +1,5 @@
+package Audio
+
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.LineUnavailableException
@@ -8,14 +10,25 @@ object AudioConsts {
   val bitDepth = 8
 }
 object AudioSynth {
-  def withDataLine(sampleRate: Int, bitDepth: Int)(fn: SourceDataLine => Unit): Unit = {
+  def mkDataLine(sampleRate: Int, bitDepth: Int): SourceDataLine  = {
     val af : AudioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
     val line : SourceDataLine = AudioSystem.getSourceDataLine(af)
     line.open(af, sampleRate)
     line.start()
-    fn(line)
+    line
+  }
+  def stopDataLine(line: SourceDataLine) = {
     line.drain()
+    line.stop()
     line.close()
+  }
+  def mkAudioSynth(sampleRate: Int, bitDepth: Int) = {
+    AudioSynth(mkDataLine(sampleRate, bitDepth), sampleRate, bitDepth)
+  }
+  def withDataLine(sampleRate: Int, bitDepth: Int)(fn: SourceDataLine => Unit): Unit = {
+    val line = mkDataLine(sampleRate, bitDepth)
+    fn(line)
+    stopDataLine(line)
   }
   def withAudioSynth(sampleRate: Int, bitDepth: Int)(fn: AudioSynth => Unit): Unit = {
     withDataLine(sampleRate, bitDepth) { line =>
@@ -70,9 +83,9 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val audioBuffer = createWaveBuffer(freq, lenMs)
     line.write(audioBuffer, 0, audioBuffer.length)
   }
-  def sweep(f1: Int, f2: Int, step: Int, lenMs: Int) : Unit = {
-    val dur = lenMs / ((f2 - f1) / step)
-    (f1 to f2).by(step).foreach { freq =>
+  def sweep(f1: Int, f2: Int, steps: Int, lenMs: Int) : Unit = {
+    val dur = lenMs / ((f2 - f1) / steps)
+    (f1 to f2).by(steps).foreach { freq =>
       val audioBuffer = createSineWaveBuffer(freq, dur)
       line.write(audioBuffer, 0, audioBuffer.length)
     }
@@ -80,6 +93,17 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   def noise(lenMs: Int) : Unit = {
     val audioBuffer = createNoiseBuffer(lenMs)
     line.write(audioBuffer, 0, audioBuffer.length)
+  }
+  def blip(f1: Int, f2: Int, steps: Int, lenMs: Int): Unit = {
+    val durMs = lenMs / steps / 2
+    val audioBuffer1 = createSineWaveBuffer(f1, durMs)
+    val audioBuffer2 = createSineWaveBuffer(f2, durMs)
+    (1 to steps).foreach { _ =>
+      line.write(audioBuffer1, 0, audioBuffer1.length)
+      line.drain
+      line.write(audioBuffer2, 0, audioBuffer2.length)
+      line.drain
+    }
   }
   def randomTones(f1: Int, f2: Int, steps: Int, lenMs: Int) : Unit = {
     val dur = lenMs / steps
@@ -90,6 +114,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       line.write(audioBuffer, 0, audioBuffer.length)
     }
   }
+  def stop() = AudioSynth.stopDataLine(line)
 }
 
 object SynthDemo {
@@ -100,6 +125,7 @@ object SynthDemo {
       audioSynth.tone(500, 500)
       audioSynth.tone3(1000, 1000)
       audioSynth.sweep(400, 1600, 5, 4000)
+      audioSynth.blip(200, 800, 25, 5000)
       audioSynth.sweep(1600, 200, -3, 4000)
       (1 to 10).foreach { i => 
         audioSynth.noise(1000/i)
