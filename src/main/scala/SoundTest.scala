@@ -85,7 +85,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val noOfSamples = (lenMs * sampleRate) / 1000
 
     (0 to noOfSamples).map { i =>
-      (rand.nextDouble * 127f).toByte
+      (rand.nextDouble() * maxVol).toByte
     }.toArray
   }
   def createSquareWave(freq: Double, lenMs: Int) = {
@@ -101,10 +101,10 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       val phaseAngle = 2.0 * Math.PI * i * freq / sampleRate
       val sineVal = sine(phaseAngle)
       if (sineVal >= 0.0)
-        127
+        maxVol
       else if (sineVal < 0.0)
-        -127
-       else 0
+        maxVol * - 1.0
+      else 0
     }.map(_.toByte).toArray
   }
   def drain(): Unit = line.drain()
@@ -146,7 +146,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val dur = lenMs / steps
     val rand = new scala.util.Random
     (1 to steps).foreach { _ =>
-      val freq = rand.nextDouble * (f2-f1) + f1
+      val freq = rand.nextDouble() * (f2-f1) + f1
       val audioBuffer = createSineWaveBuffer(freq.toInt, dur)
       line.write(audioBuffer, 0, audioBuffer.length)
     }
@@ -158,6 +158,11 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(sampleRate, bitDepth) { audioSynth =>
+      // check is relatively free of zc noise
+      (1 to 50).foreach { i =>
+        audioSynth.tone(950+i, 50-i/3)
+      }
+      audioSynth.tone(100, 1000)
       audioSynth.square(1000, 1000)
       audioSynth.square(400, 1000)
       audioSynth.tone(1000, 1000)
@@ -165,6 +170,7 @@ object SynthDemo {
       audioSynth.tone(700, 900)
       audioSynth.tone(500, 500)
       audioSynth.tone3(1000, 1000)
+      audioSynth.blip(500, 1000, 100, 4000)
       audioSynth.sweep(400, 1600, 5, 4000)
       audioSynth.blip(200, 800, 25, 5000)
       audioSynth.sweep(1600, 200, -3, 4000)
