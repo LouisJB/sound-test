@@ -45,15 +45,10 @@ object AudioSynth {
 case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   import Math._
   import Debug._
+  val PiPi = Math.PI * 2.0
   val maxVol = Math.pow(2.0, bitDepth - 1) - 1
   println(s"Initializing audio synth to sample rate : $sampleRate, bit depth: $bitDepth, max vol: $maxVol")
-  def sine(phaseAngle: Double) : Double = sin(phaseAngle) * maxVol
-  def sine3(phaseAngle : Double) : Double = {
-    val f1 = sin(phaseAngle)
-    val f3 = sin(phaseAngle * 3)
-    (f1 * maxVol * 0.7) + (f3 * maxVol * 0.3)
-  }
-  def createSineWaveBuffer(freq: Double, lenMs: Int) = {
+  def sampleLength(freq: Double, lenMs: Int): Int = {
     debug("Feq: " + freq)
     val periodMs = 1 / freq * 1000 // ms
     debug("periodMs: " + periodMs)
@@ -61,9 +56,18 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     debug("waveCount: " + waveCount)
     val noOfSamples = (waveCount * periodMs * sampleRate / 1000).toInt
     debug("numberOfSamples: " + noOfSamples)
-
+    noOfSamples
+  }  
+  def sine(phaseAngle: Double) : Double = sin(phaseAngle) * maxVol
+  def sine3(phaseAngle : Double) : Double = {
+    val f1 = sin(phaseAngle)
+    val f3 = sin(phaseAngle * 3)
+    (f1 * maxVol * 0.7) + (f3 * maxVol * 0.3)
+  }
+  def createSineWaveBuffer(freq: Double, lenMs: Int) = {
+    val noOfSamples = sampleLength(freq, lenMs)
     val waveBuffer = (0 to noOfSamples).map { i =>
-      val phaseAngle = 2.0 * Math.PI * i * freq / sampleRate
+      val phaseAngle = PiPi * i * freq / sampleRate
       sine(phaseAngle).toByte
     }.toArray
     debug(waveBuffer.toSeq.take(100).mkString(", "))
@@ -72,10 +76,9 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   }
   def createWaveBuffer(freq: Double, lenMs: Int, sineF : Double => Double = sine3) = {
     val period = sampleRate / freq
-    val noOfSamples = (lenMs * sampleRate) / 1000
-
+    val noOfSamples = sampleLength(freq, lenMs)
     (0 to noOfSamples).map { i =>
-      val phaseAngle = 2.0 * Math.PI * i / period
+      val phaseAngle = PiPi * i / period
 
       sineF(phaseAngle).toByte
     }.toArray
@@ -83,23 +86,33 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   def createNoiseBuffer(lenMs: Int) = {
     val rand = new scala.util.Random
     val noOfSamples = (lenMs * sampleRate) / 1000
-
     (0 to noOfSamples).map { i =>
       (rand.nextDouble() * maxVol).toByte
     }.toArray
   }
   def createSquareWave(freq: Double, lenMs: Int) = {
-    debug("Feq: " + freq)
-    val periodMs = 1 / freq * 1000 // ms
-    debug("periodMs: " + periodMs)
-    val waveCount = (lenMs / periodMs).toInt
-    debug("waveCount: " + waveCount)
-    val noOfSamples = (waveCount * periodMs * sampleRate / 1000).toInt
-    debug("numberOfSamples: " + noOfSamples)
+    val noOfSamples = sampleLength(freq, lenMs)
 
     (0 to noOfSamples).map { i =>
-      val phaseAngle = 2.0 * Math.PI * i * freq / sampleRate
+      val phaseAngle = PiPi * i * freq / sampleRate
       sine(phaseAngle).sign * maxVol
+    }.map(_.toByte).toArray
+  }
+  def createSawWave(freq: Double, lenMs: Int) = {
+    val noOfSamples = sampleLength(freq, lenMs)
+    (0 to noOfSamples).map { i =>
+      val phaseAngle = (PiPi * i * freq / sampleRate) % PiPi
+      ((2.0 * phaseAngle / PiPi) - 1.0) * maxVol
+    }.map(_.toByte).toArray
+  }
+  def createTriWave(freq: Double, lenMs: Int) = {
+    val noOfSamples = sampleLength(freq, lenMs)
+    (0 to noOfSamples).map { i =>
+      val phaseAngle = (PiPi * i * freq / sampleRate) % PiPi
+      if (phaseAngle < PiPi / 2)
+        ((4.0 * phaseAngle / PiPi) - 1.0) * maxVol
+      else
+        ((4.0 * (PiPi / 2 - phaseAngle) / PiPi) + 1.0) * maxVol
     }.map(_.toByte).toArray
   }
   def drain(): Unit = line.drain()
@@ -113,6 +126,14 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   }
   def square(freq: Int, lenMs: Int): Unit = {
     val audioBuffer = createSquareWave(freq, lenMs)
+    line.write(audioBuffer, 0, audioBuffer.length)
+  }
+  def saw(freq: Int, lenMs: Int): Unit = {
+    val audioBuffer = createSawWave(freq, lenMs)
+    line.write(audioBuffer, 0, audioBuffer.length)
+  }
+  def tri(freq: Int, lenMs: Int): Unit = {
+    val audioBuffer = createTriWave(freq, lenMs)
     line.write(audioBuffer, 0, audioBuffer.length)
   }
   def sweep(f1: Int, f2: Int, steps: Int, lenMs: Int) : Unit = {
@@ -159,6 +180,10 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(sampleRate, bitDepth) { audioSynth =>
+      audioSynth.tone(500, 1000)
+      audioSynth.square(500, 1000)
+      audioSynth.saw(500, 1000)
+      audioSynth.tri(500, 1000)
       // check is relatively free of zc noise
       (1 to 50).foreach { i =>
         audioSynth.tone(950+i, 50-i/3)
