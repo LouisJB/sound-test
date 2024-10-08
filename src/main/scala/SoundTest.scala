@@ -115,6 +115,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
         ((4.0 * (PiPi / 2 - phaseAngle) / PiPi) + 1.0) * maxVol
     }.map(_.toByte).toArray
   }
+  def play(ab: Array[Byte]) = line.write(ab, 0, ab.length)
   def drain(): Unit = line.drain()
   def tone(freq: Int, lenMs: Int): Unit = {
     val audioBuffer = createSineWaveBuffer(freq, lenMs)
@@ -180,6 +181,9 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(sampleRate, bitDepth) { audioSynth =>
+
+      DTMF(audioSynth).play("T  001 718 8675309 #")
+
       audioSynth.tone(500, 1000)
       audioSynth.square(500, 1000)
       audioSynth.saw(500, 1000)
