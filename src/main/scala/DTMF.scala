@@ -1,6 +1,38 @@
 package Audio
 
+case class DTMF(as: AudioSynth, lengthMs: Int = defaultLengthMs, digitGapMs: Int = defaultDigitGapMs) {
+  import DTMF._
+  println("DTMF dialertron v0.1")
+  def play(digits : String) = {
+    println(s"Playing autodialing at rate; toneLenghMs: $lengthMs, toneGapMs: $digitGapMs")
+    digits.foreach( _ match {
+      case ' ' => Thread.sleep(lengthMs + digitGapMs)
+      case 'S' => Thread.sleep(4000)
+      case 'R' => as.play(mkTones(keyMap('R'), 2000)) 
+      case 'T' => as.play(mkTones(keyMap('T'), lengthMs * 10)) 
+      case c =>
+        val key = keyMap(c)
+        as.play(mkTones(key))
+        as.line.drain()
+        Thread.sleep(digitGapMs)
+      }
+    )
+  }
+
+  def mkTones(key: Key, lenMs: Int = lengthMs) = {
+    val (f1, f2) = key.freqs 
+    val tone1 = as.createSineWaveBuffer(f1, lenMs).toSeq
+    val tone2 = as.createSineWaveBuffer(f2, lenMs).toSeq
+    val tones = tone1.zipAll(tone2, 0:Byte, 0:Byte).map { case (w1, w2) =>
+      ((w1.toDouble + w2.toDouble) / 2).toByte
+    }.toArray
+    println(s"key: $key, ${tone1.length}, ${tone2.length}, ${tones.length}")
+    tones
+  }
+}
+
 object DTMF {
+  // col and row frequencies
   val col1 = 1209
   val col2 = 1336
   val col3 = 1477
@@ -11,7 +43,9 @@ object DTMF {
   val row3 = 852
   val row4 = 941
 
-  case class Key(char: Char, freqs: (Int, Int))
+  case class Key(char: Char, freqs: (Int, Int)) {
+    override def toString = s"$char : ${freqs._1}Hz, ${freqs._2}Hz"
+  }
 
   val k1 = Key('1', (row1, col1))
   val k2 = Key('2', (row1, col2))
@@ -28,42 +62,35 @@ object DTMF {
   val k9 = Key('9', (row3, col3))
   val kC = Key('C', (row3, col4))
 
-  val kDt = Key('T', (350, 440))
-
   val kStar = Key('*', (row4, col1))
   val k0 = Key('0', (row4, col2))
   val kHash = Key('#', (row4, col3))
   val kD = Key('D', (row4, col4))
 
-  val keys = Seq(k1, k2, k3, kA, k4, k5, k6, kB, k7, k8, k9, kC, kStar, k0, kHash, kD, kDt)
+  val kDt = Key('T', (350, 440))
+  val kDr = Key('R', (440, 480))
+
+  val keys = Seq(k1, k2, k3, kA, k4, k5, k6, kB, k7, k8, k9, kC, kStar, k0, kHash, kD, kDt, kDr)
   val keyMap: Map[Char, Key] = keys.map(k => (k.char, k)).toMap
 
   val defaultLengthMs = 250
-  val defaultDigitGapMs = 150
+  val defaultDigitGapMs = 150  
 }
 
-case class DTMF(as: AudioSynth, lengthMs: Int = defaultLengthMs, digitGapMs: Int = defaultDigitGapMs) {
-  import DTMF._
-  def play(digits : String) = {
-    digits.foreach( _ match {
-      case ' ' => Thread.sleep(lengthMs + digitGapMs)
-      case 'T' => as.play(mkTone(keyMap('T'), lengthMs * 10)) 
-      case c =>
-        val key = keyMap(c)
-        as.play(mkTone(key))
-        Thread.sleep(digitGapMs)
+object DTMFDemo {
+  def main(args: Array[String]): Unit = {
+    AudioSynth.withAudioSynth(48000, 8) { audioSynth =>
+      if (args.length == 0) {
+        DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
+        Thread.sleep(1000)
+        (1 to 2).foreach { _ =>
+          audioSynth.blip(1500, 1900, 10, 2000)
+          Thread.sleep(4000)
+        }
       }
-    )
-  }
-
-  def mkTone(key: Key, lenMs: Int = lengthMs) = {
-    val (f1, f2) = key.freqs
-    val tone1 = as.createSineWaveBuffer(f1, lenMs).toSeq
-    val tone2 = as.createSineWaveBuffer(f2, lenMs).toSeq
-    val tone = tone1.zipAll(tone2, 0:Byte, 0:Byte).map { case (w1, w2) =>
-      ((w1.toDouble + w2.toDouble) / 2).toByte
-    }.toArray
-    println(s"key: $key, ${tone1.length}, ${tone2.length}, ${tone.length}")
-    tone
+      else {
+        DTMF(audioSynth).play(args(0))
+      }
+    }  
   }
 }

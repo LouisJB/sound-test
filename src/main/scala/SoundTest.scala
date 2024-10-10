@@ -15,11 +15,14 @@ object Debug {
     println(s)
 }
 object AudioSynth {
+  println("AudioSynthi v0.1")
   def mkDataLine(sampleRate: Int, bitDepth: Int): SourceDataLine  = {
     val af : AudioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
     val line : SourceDataLine = AudioSystem.getSourceDataLine(af)
     line.open(af, sampleRate)
     line.start()
+    println(line.getLineInfo())
+    println(line.getFormat())
     line
   }
   def stopDataLine(line: SourceDataLine) = {
@@ -47,7 +50,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   import Debug._
   val PiPi = Math.PI * 2.0
   val maxVol = Math.pow(2.0, bitDepth - 1) - 1
-  println(s"Initializing audio synth to sample rate : $sampleRate, bit depth: $bitDepth, max vol: $maxVol")
+  println(s"Initialized audio synth to sample rate : $sampleRate, bit depth: $bitDepth, max vol: $maxVol")
   def sampleLength(freq: Double, lenMs: Int): Int = {
     debug("Feq: " + freq)
     val periodMs = 1 / freq * 1000 // ms
@@ -154,9 +157,9 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val audioBuffer2 = createSineWaveBuffer(f2, durMs)
     (1 to steps).foreach { _ =>
       line.write(audioBuffer1, 0, audioBuffer1.length)
-      line.drain()
+      //line.drain())
       line.write(audioBuffer2, 0, audioBuffer2.length)
-      line.drain()
+      //line.drain()
     }
   }
   def blipSweep(f1: Int, f2: Int, f3: Int, steps: Int, substeps: Int, lenMs: Int) : Unit = {
@@ -182,8 +185,12 @@ object SynthDemo {
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(sampleRate, bitDepth) { audioSynth =>
 
-      DTMF(audioSynth).play("T  001 718 8675309 #")
-
+      DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
+      Thread.sleep(1000)
+      (1 to 2).foreach { _ =>
+        audioSynth.blip(1500, 1900, 10, 2000)
+        Thread.sleep(4000)
+      }
       audioSynth.tone(500, 1000)
       audioSynth.square(500, 1000)
       audioSynth.saw(500, 1000)
