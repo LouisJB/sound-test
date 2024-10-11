@@ -6,15 +6,14 @@ case class DTMF(as: AudioSynth, lengthMs: Int = defaultLengthMs, digitGapMs: Int
   def play(digits : String) = {
     println(s"Playing autodialing at rate; toneLenghMs: $lengthMs, toneGapMs: $digitGapMs")
     digits.foreach( _ match {
-      case ' ' => Thread.sleep(lengthMs + digitGapMs)
-      case 'S' => Thread.sleep(4000)
+      case ' ' => as.silence(lengthMs + digitGapMs)
+      case 'S' => as.silence(4000)
       case 'R' => as.play(mkTones(keyMap('R'), 2000)) 
       case 'T' => as.play(mkTones(keyMap('T'), lengthMs * 10)) 
       case c =>
         val key = keyMap(c)
         as.play(mkTones(key))
-        as.line.drain()
-        Thread.sleep(digitGapMs)
+        as.silence(digitGapMs)
       }
     )
   }
@@ -78,14 +77,16 @@ object DTMF {
 }
 
 object DTMFDemo {
+  val defaultSampleRate = 48000
+  val defaintBitDepth = 8
   def main(args: Array[String]): Unit = {
-    AudioSynth.withAudioSynth(48000, 8) { audioSynth =>
+    AudioSynth.withAudioSynth(defaultSampleRate, defaintBitDepth) { audioSynth =>
       if (args.length == 0) {
         DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
-        Thread.sleep(1000)
+        audioSynth.silence(1000)
         (1 to 2).foreach { _ =>
           audioSynth.blip(1500, 1900, 10, 2000)
-          Thread.sleep(4000)
+          audioSynth.silence(4000)
         }
       }
       else {

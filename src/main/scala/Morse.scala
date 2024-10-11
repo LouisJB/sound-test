@@ -28,16 +28,13 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
           case '.' =>
             as.tone(pitch, tDitMs)
           }
-          as.drain()
-          Thread.sleep(tGapMs)
+          as.silence(tGapMs)
         }
-        as.drain()
-        Thread.sleep(tLetterSpaceMs)
+        as.silence(tLetterSpaceMs)
         digits + " "
       case ' ' =>
         print(' ')
-        as.drain()
-        Thread.sleep(tWordSpaceMs)
+        as.silence(tWordSpaceMs)
         " / "
       }
     }.flatten
@@ -137,14 +134,16 @@ object Morse {
 }
 
 object MorseDemo {
+  val defaultSampleRate = 48000
+  val defaintBitDepth = 8
   def main(args: Array[String]): Unit = {
-    AudioSynth.withAudioSynth(48000, 8) { audioSynth =>
-      val m = Morse(audioSynth, wpm = 15, maybeWpmFarns = Some(10))
+    AudioSynth.withAudioSynth(defaultSampleRate, defaintBitDepth) { audioSynth =>
+      val morse = Morse(audioSynth, wpm = 15, maybeWpmFarns = Some(10))
       if (args.length == 0) {
-        m.play("cq kd2yck pse k.")
+        morse.play("cq kd2yck pse k.")
       }
       else {
-        m.play(args(0))
+        morse.play(args(0))
       }
     }
     println("All done, 73!")

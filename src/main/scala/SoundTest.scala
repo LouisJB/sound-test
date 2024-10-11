@@ -6,8 +6,9 @@ import javax.sound.sampled.LineUnavailableException
 import javax.sound.sampled.SourceDataLine
 
 object AudioConsts {
-  val sampleRate = 96 * 1000
-  val bitDepth = 8
+  val defaultSampleRate = 96 * 1000
+  val defaultBitDepth = 8
+  val defaultBufferSize = 4096
 }
 object Debug {
   val enabled = false
@@ -16,10 +17,10 @@ object Debug {
 }
 object AudioSynth {
   println("AudioSynthi v0.1")
-  def mkDataLine(sampleRate: Int, bitDepth: Int): SourceDataLine  = {
+  def mkDataLine(sampleRate: Int, bitDepth: Int, bufferSize: Int = AudioConsts.defaultBufferSize): SourceDataLine  = {
     val af : AudioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
     val line : SourceDataLine = AudioSystem.getSourceDataLine(af)
-    line.open(af, sampleRate)
+    line.open(af, bufferSize)
     line.start()
     println(line.getLineInfo())
     println(line.getFormat())
@@ -30,15 +31,15 @@ object AudioSynth {
     line.stop()
     line.close()
   }
-  def mkAudioSynth(sampleRate: Int, bitDepth: Int) = {
+  def mkAudioSynth(sampleRate: Int, bitDepth: Int) =
     AudioSynth(mkDataLine(sampleRate, bitDepth), sampleRate, bitDepth)
-  }
   def withDataLine(sampleRate: Int, bitDepth: Int)(fn: SourceDataLine => Unit): Unit = {
     val line = mkDataLine(sampleRate, bitDepth)
     fn(line)
     stopDataLine(line)
   }
-  def withAudioSynth(sampleRate: Int, bitDepth: Int)(fn: AudioSynth => Unit): Unit = {
+  def withAudioSynth(sampleRate: Int = AudioConsts.defaultSampleRate,
+                     bitDepth: Int = AudioConsts.defaultBitDepth)(fn: AudioSynth => Unit): Unit = {
     withDataLine(sampleRate, bitDepth) { line =>
       val as = AudioSynth(line, sampleRate, bitDepth)
       fn(as)
@@ -67,12 +68,31 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val f3 = sin(phaseAngle * 3)
     (f1 * maxVol * 0.7) + (f3 * maxVol * 0.3)
   }
+  def createSilenceBuffer(lenMs: Int) = {
+    val noOfSamples = lenMs * sampleRate / 1000
+    (0 to noOfSamples).map(_ => (0).toByte).toArray
+  }
   def createSineWaveBuffer(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
     val waveBuffer = (0 to noOfSamples).map { i =>
       val phaseAngle = PiPi * i * freq / sampleRate
       sine(phaseAngle).toByte
     }.toArray
+    debug(waveBuffer.toSeq.take(100).mkString(", "))
+    debug(waveBuffer.toSeq.drop(noOfSamples - 50).mkString(", "))
+    waveBuffer
+  }
+  // simple symetrical attack/decay rise/fall times
+  def createSineWavePulseBuffer(freq: Double, lenMs: Int, rampTimeMs: Int = 100) = {
+    val waveBufferRaw = createSineWaveBuffer(freq, lenMs)
+    val noOfSamples = waveBufferRaw.length
+    val rampLength = sampleRate * rampTimeMs / 1000.0
+    val waveBuffer = waveBufferRaw.zipWithIndex.map { case (s, i) =>
+      (s * min(
+        min(1.0, min(i, rampLength)/rampLength),
+        min(1.0, min(noOfSamples - i, rampLength)/rampLength)
+      )).toByte
+    }
     debug(waveBuffer.toSeq.take(100).mkString(", "))
     debug(waveBuffer.toSeq.drop(noOfSamples - 50).mkString(", "))
     waveBuffer
@@ -120,8 +140,16 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   }
   def play(ab: Array[Byte]) = line.write(ab, 0, ab.length)
   def drain(): Unit = line.drain()
+  def silence(lenMs: Int): Unit = {
+    val audioBuffer = createSilenceBuffer(lenMs)
+    line.write(audioBuffer, 0, audioBuffer.length)
+  }
   def tone(freq: Int, lenMs: Int): Unit = {
     val audioBuffer = createSineWaveBuffer(freq, lenMs)
+    line.write(audioBuffer, 0, audioBuffer.length)
+  }
+  def pulse(freq: Int, lenMs: Int, rampTimeMs: Int = 100) = {
+    val audioBuffer = createSineWavePulseBuffer(freq, lenMs, rampTimeMs)
     line.write(audioBuffer, 0, audioBuffer.length)
   }
   def tone3(freq: Int, lenMs: Int): Unit = {
@@ -183,14 +211,8 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
 object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
-    AudioSynth.withAudioSynth(sampleRate, bitDepth) { audioSynth =>
-
-      DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
-      Thread.sleep(1000)
-      (1 to 2).foreach { _ =>
-        audioSynth.blip(1500, 1900, 10, 2000)
-        Thread.sleep(4000)
-      }
+    AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
+      audioSynth.pulse(1000, 5000, 2000)
       audioSynth.tone(500, 1000)
       audioSynth.square(500, 1000)
       audioSynth.saw(500, 1000)
@@ -219,6 +241,13 @@ object SynthDemo {
       }
       audioSynth.randomTones(200, 1000, 20, 5000)
       audioSynth.sweep(3200, 300, -10, 5000)
+
+      DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
+      Thread.sleep(1000)
+      (1 to 2).foreach { _ =>
+        audioSynth.blip(1500, 1900, 10, 2000)
+        Thread.sleep(4000)
+      }
     }
   }
 }
