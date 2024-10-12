@@ -81,17 +81,30 @@ object DTMFDemo {
   val defaintBitDepth = 8
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaintBitDepth) { audioSynth =>
+      val dtmf = DTMF(audioSynth)
       if (args.length == 0) {
-        DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
+        dtmf.play("T  001 718 8675309 # RSRSR")
         audioSynth.silence(1000)
         (1 to 2).foreach { _ =>
           audioSynth.blip(1500, 1900, 10, 2000)
           audioSynth.silence(4000)
         }
       }
-      else {
-        DTMF(audioSynth).play(args(0))
+      else if (args.contains("-i")) {
+        while (true) {
+          println("type dial string and press enter (/ex to quit)")
+          val text = Console.in.readLine()
+          if (text == "/ex") {
+            println("All done, 73")
+            System.exit(0)
+          }
+          dtmf.play(text)
+          println("dialed: " + text)
+          audioSynth.silence(500)
+        }
       }
-    }  
+      else
+        dtmf.play(args(0))
+    }
   }
 }

@@ -210,46 +210,68 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
-      val sineAb = audioSynth.mkSineWaveBuffer(1000, 1000)
-      audioSynth.save("wav/sine-1kHz.wav", sineAb)
-      val triAb = audioSynth.mkTriWave(1000, 1000)
-      audioSynth.save("wav/tri-1kHz.wav", triAb)
-      
-      audioSynth.pulse(1000, 5000, 2000)
-      audioSynth.tone(500, 1000)
-      audioSynth.square(500, 1000)
-      audioSynth.saw(500, 1000)
-      audioSynth.tri(500, 1000)
-      // check is relatively free of zc noise
-      (1 to 50).foreach { i =>
-        audioSynth.tone(950+i, 50-i/3)
+      if (args.contains("-i")) {
+        println("type cmd and press enter (/ex to quit)")
+        while (true) {
+          val line = Console.in.readLine()
+          if (line == "/ex")
+            System.exit(0)
+          else line match {
+            case "s" =>
+              audioSynth.tone(1000, 5000)
+            case "t" =>
+              audioSynth.tri(1000, 5000)
+            case "w" =>
+              audioSynth.saw(1000, 5000)
+            case "n" =>
+              audioSynth.noise(5000)  
+            case _ =>
+          }
+          audioSynth.silence(250)
+        }
       }
-      audioSynth.blipSweep(500, 2500, 200, 100, 4, 5000)
-      audioSynth.tone(100, 1000)
-      audioSynth.square(1000, 1000)
-      audioSynth.square(400, 1000)
-      audioSynth.tone(1000, 1000)
-      audioSynth.tone(750, 1000)
-      audioSynth.tone(700, 900)
-      audioSynth.tone(500, 500)
-      audioSynth.tone3(1000, 1000)
-      audioSynth.blip(500, 1000, 100, 4000)
-      audioSynth.sweep(400, 1600, 5, 4000)
-      audioSynth.blip(200, 800, 25, 5000)
-      audioSynth.sweep(1600, 200, -3, 4000)
-      (1 to 10).foreach { i => 
-        audioSynth.noise(1000/i)
-        audioSynth.drain()
-        Thread.sleep(1000/(11-i))
-      }
-      audioSynth.randomTones(200, 1000, 20, 5000)
-      audioSynth.sweep(3200, 300, -10, 5000)
+      else {
+        val sineAb = audioSynth.mkSineWaveBuffer(1000, 1000)
+        audioSynth.save("wav/sine-1kHz.wav", sineAb)
+        val triAb = audioSynth.mkTriWave(1000, 1000)
+        audioSynth.save("wav/tri-1kHz.wav", triAb)
 
-      DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
-      Thread.sleep(1000)
-      (1 to 2).foreach { _ =>
-        audioSynth.blip(1500, 1900, 10, 2000)
-        Thread.sleep(4000)
+        audioSynth.pulse(1000, 5000, 2000)
+        audioSynth.tone(500, 1000)
+        audioSynth.square(500, 1000)
+        audioSynth.saw(500, 1000)
+        audioSynth.tri(500, 1000)
+        // check is relatively free of zc noise
+        (1 to 50).foreach { i =>
+          audioSynth.tone(950+i, 50-i/3)
+        }
+        audioSynth.blipSweep(500, 2500, 200, 100, 4, 5000)
+        audioSynth.tone(100, 1000)
+        audioSynth.square(1000, 1000)
+        audioSynth.square(400, 1000)
+        audioSynth.tone(1000, 1000)
+        audioSynth.tone(750, 1000)
+        audioSynth.tone(700, 900)
+        audioSynth.tone(500, 500)
+        audioSynth.tone3(1000, 1000)
+        audioSynth.blip(500, 1000, 100, 4000)
+        audioSynth.sweep(400, 1600, 5, 4000)
+        audioSynth.blip(200, 800, 25, 5000)
+        audioSynth.sweep(1600, 200, -3, 4000)
+        (1 to 10).foreach { i => 
+          audioSynth.noise(1000/i)
+          audioSynth.drain()
+          Thread.sleep(1000/(11-i))
+        }
+        audioSynth.randomTones(200, 1000, 20, 5000)
+        audioSynth.sweep(3200, 300, -10, 5000)
+
+        DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
+        Thread.sleep(1000)
+        (1 to 2).foreach { _ =>
+          audioSynth.blip(1500, 1900, 10, 2000)
+          Thread.sleep(4000)
+        }
       }
     }
   }
