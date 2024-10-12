@@ -15,8 +15,9 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
 
   println(s"Time Unit: $tMs ms, Time Unit Farnsworth: $tFarnsMs ms\n")
 
-  def play(text: String) = {
-    println(s"Morse: Playing text string:\n$text")
+  def play(text: String, echo: Boolean = true) = {
+    if (echo)
+      println(s"Morse: Playing text string:\n$text")
 
     val morse = text.map { _ match {
       case c if c != ' ' =>
@@ -40,6 +41,18 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
     }.flatten
     println
     println(morse.mkString)
+  }
+
+  def replMode(): Unit = {
+    println("Repl mode, please type your words and enter to play, /ex to exit")
+    while (true) {
+      val text = Console.in.readLine()
+      if (text == "/ex") {
+        println("All done, 73")
+        System.exit(0)
+      }
+      play(text, false)
+    }
   }
 }
 
@@ -139,12 +152,12 @@ object MorseDemo {
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaintBitDepth) { audioSynth =>
       val morse = Morse(audioSynth, wpm = 15, maybeWpmFarns = Some(10))
-      if (args.length == 0) {
+      if (args.length == 0)
         morse.play("cq kd2yck pse k.")
-      }
-      else {
+      else if (args.length == 1 && args(0) == "-i")
+        morse.replMode()
+      else
         morse.play(args(0))
-      }
     }
     println("All done, 73!")
   }
