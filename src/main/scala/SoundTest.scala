@@ -4,6 +4,12 @@ import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.LineUnavailableException
 import javax.sound.sampled.SourceDataLine
+import javax.sound.sampled.AudioFileFormat
+import java.io.File
+import javax.sound.sampled.AudioInputStream
+import javax.sound.sampled.TargetDataLine
+import javax.sound.sampled.DataLine
+import java.io.ByteArrayInputStream
 
 object AudioConsts {
   val defaultSampleRate = 96 * 1000
@@ -68,11 +74,11 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val f3 = sin(phaseAngle * 3)
     (f1 * maxVol * 0.7) + (f3 * maxVol * 0.3)
   }
-  def createSilenceBuffer(lenMs: Int) = {
+  def mkSilenceBuffer(lenMs: Int) = {
     val noOfSamples = lenMs * sampleRate / 1000
     (0 to noOfSamples).map(_ => (0).toByte).toArray
   }
-  def createSineWaveBuffer(freq: Double, lenMs: Int) = {
+  def mkSineWaveBuffer(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
     val waveBuffer = (0 to noOfSamples).map { i =>
       val phaseAngle = PiPi * i * freq / sampleRate
@@ -83,8 +89,8 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     waveBuffer
   }
   // simple symetrical attack/decay rise/fall times
-  def createSineWavePulseBuffer(freq: Double, lenMs: Int, rampTimeMs: Int = 100) = {
-    val waveBufferRaw = createSineWaveBuffer(freq, lenMs)
+  def mkSineWavePulseBuffer(freq: Double, lenMs: Int, rampTimeMs: Int = 100) = {
+    val waveBufferRaw = mkSineWaveBuffer(freq, lenMs)
     val noOfSamples = waveBufferRaw.length
     val rampLength = sampleRate * rampTimeMs / 1000.0
     val waveBuffer = waveBufferRaw.zipWithIndex.map { case (s, i) =>
@@ -97,7 +103,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     debug(waveBuffer.toSeq.drop(noOfSamples - 50).mkString(", "))
     waveBuffer
   }
-  def createWaveBuffer(freq: Double, lenMs: Int, sineF : Double => Double = sine3) = {
+  def mkWaveBuffer(freq: Double, lenMs: Int, sineF : Double => Double = sine3) = {
     val period = sampleRate / freq
     val noOfSamples = sampleLength(freq, lenMs)
     (0 to noOfSamples).map { i =>
@@ -106,14 +112,14 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       sineF(phaseAngle).toByte
     }.toArray
   }
-  def createNoiseBuffer(lenMs: Int) = {
+  def mkNoiseBuffer(lenMs: Int) = {
     val rand = new scala.util.Random
     val noOfSamples = (lenMs * sampleRate) / 1000
     (0 to noOfSamples).map { i =>
       (rand.nextDouble() * maxVol).toByte
     }.toArray
   }
-  def createSquareWave(freq: Double, lenMs: Int) = {
+  def mkSquareWave(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
 
     (0 to noOfSamples).map { i =>
@@ -121,14 +127,14 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       sine(phaseAngle).sign * maxVol
     }.map(_.toByte).toArray
   }
-  def createSawWave(freq: Double, lenMs: Int) = {
+  def mkSawWave(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
     (0 to noOfSamples).map { i =>
       val phaseAngle = (PiPi * i * freq / sampleRate) % PiPi
       ((2.0 * phaseAngle / PiPi) - 1.0) * maxVol
     }.map(_.toByte).toArray
   }
-  def createTriWave(freq: Double, lenMs: Int) = {
+  def mkTriWave(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
     (0 to noOfSamples).map { i =>
       val phaseAngle = (PiPi * i * freq / sampleRate) % PiPi
@@ -139,55 +145,47 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     }.map(_.toByte).toArray
   }
   def play(ab: Array[Byte]) = line.write(ab, 0, ab.length)
+  def save(path: String, ab : Array[Byte]) = {
+    // preset to mono wav for now
+    val outputFile = new File(path).getAbsoluteFile()
+    outputFile.getParentFile.mkdirs()
+    val audioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
+    val outStream = new AudioInputStream(
+      new ByteArrayInputStream(ab),
+      audioFormat,
+      ab.length)
+    AudioSystem.write(outStream, AudioFileFormat.Type.WAVE, outputFile)
+  }
   def drain(): Unit = line.drain()
-  def silence(lenMs: Int): Unit = {
-    val audioBuffer = createSilenceBuffer(lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
-  def tone(freq: Int, lenMs: Int): Unit = {
-    val audioBuffer = createSineWaveBuffer(freq, lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
-  def pulse(freq: Int, lenMs: Int, rampTimeMs: Int = 100) = {
-    val audioBuffer = createSineWavePulseBuffer(freq, lenMs, rampTimeMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
-  def tone3(freq: Int, lenMs: Int): Unit = {
-    val audioBuffer = createWaveBuffer(freq, lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
-  def square(freq: Int, lenMs: Int): Unit = {
-    val audioBuffer = createSquareWave(freq, lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
-  def saw(freq: Int, lenMs: Int): Unit = {
-    val audioBuffer = createSawWave(freq, lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
-  def tri(freq: Int, lenMs: Int): Unit = {
-    val audioBuffer = createTriWave(freq, lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
+  def silence(lenMs: Int): Unit =
+    play(mkSilenceBuffer(lenMs))
+  def tone(freq: Int, lenMs: Int): Unit =
+    play(mkSineWaveBuffer(freq, lenMs))
+  def pulse(freq: Int, lenMs: Int, rampTimeMs: Int = 100) =
+    play(mkSineWavePulseBuffer(freq, lenMs, rampTimeMs))
+  def tone3(freq: Int, lenMs: Int): Unit =
+    play(mkWaveBuffer(freq, lenMs))
+  def square(freq: Int, lenMs: Int): Unit =
+    play(mkSquareWave(freq, lenMs))
+  def saw(freq: Int, lenMs: Int): Unit =
+    play(mkSawWave(freq, lenMs))
+  def tri(freq: Int, lenMs: Int): Unit =
+    play(mkTriWave(freq, lenMs))
   def sweep(f1: Int, f2: Int, steps: Int, lenMs: Int) : Unit = {
     val dur = lenMs / ((f2 - f1) / steps)
     (f1 to f2).by(steps).foreach { freq =>
-      val audioBuffer = createSineWaveBuffer(freq, dur)
-      line.write(audioBuffer, 0, audioBuffer.length)
+      play(mkSineWaveBuffer(freq, dur))
     }
   }
-  def noise(lenMs: Int) : Unit = {
-    val audioBuffer = createNoiseBuffer(lenMs)
-    line.write(audioBuffer, 0, audioBuffer.length)
-  }
+  def noise(lenMs: Int) : Unit =
+    play(mkNoiseBuffer(lenMs))
   def blip(f1: Int, f2: Int, steps: Int, lenMs: Int): Unit = {
     val durMs = lenMs / steps / 2
-    val audioBuffer1 = createSineWaveBuffer(f1, durMs)
-    val audioBuffer2 = createSineWaveBuffer(f2, durMs)
+    val audioBuffer1 = mkSineWaveBuffer(f1, durMs)
+    val audioBuffer2 = mkSineWaveBuffer(f2, durMs)
     (1 to steps).foreach { _ =>
-      line.write(audioBuffer1, 0, audioBuffer1.length)
-      //line.drain())
-      line.write(audioBuffer2, 0, audioBuffer2.length)
-      //line.drain()
+      play(audioBuffer1)
+      play(audioBuffer2)
     }
   }
   def blipSweep(f1: Int, f2: Int, f3: Int, steps: Int, substeps: Int, lenMs: Int) : Unit = {
@@ -201,8 +199,8 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val rand = new scala.util.Random
     (1 to steps).foreach { _ =>
       val freq = rand.nextDouble() * (f2-f1) + f1
-      val audioBuffer = createSineWaveBuffer(freq.toInt, dur)
-      line.write(audioBuffer, 0, audioBuffer.length)
+      val audioBuffer = mkSineWaveBuffer(freq.toInt, dur)
+      play(audioBuffer)
     }
   }
   def stop() = AudioSynth.stopDataLine(line)
@@ -212,6 +210,11 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
+      val sineAb = audioSynth.mkSineWaveBuffer(1000, 1000)
+      audioSynth.save("wav/sine-1kHz.wav", sineAb)
+      val triAb = audioSynth.mkTriWave(1000, 1000)
+      audioSynth.save("wav/tri-1kHz.wav", triAb)
+      
       audioSynth.pulse(1000, 5000, 2000)
       audioSynth.tone(500, 1000)
       audioSynth.square(500, 1000)
