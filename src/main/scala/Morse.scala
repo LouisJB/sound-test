@@ -25,9 +25,9 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
         val digits = map(c)
         digits.foreach { d => d match { 
           case '-' => 
-            as.tone(pitch, tDahMs)
+            as.sine(pitch, tDahMs)
           case '.' =>
-            as.tone(pitch, tDitMs)
+            as.sine(pitch, tDitMs)
           }
           as.silence(tGapMs)
         }
@@ -154,7 +154,7 @@ object MorseDemo {
       val morse = Morse(audioSynth, wpm = 15, maybeWpmFarns = Some(10))
       if (args.length == 0)
         morse.play("cq kd2yck pse k.")
-      else if (args.length == 1 && args(0) == "-i")
+      else if (args.length == 1 && args(0) == "-r")
         morse.replMode()
       else
         morse.play(args(0))

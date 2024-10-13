@@ -108,7 +108,6 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val noOfSamples = sampleLength(freq, lenMs)
     (0 to noOfSamples).map { i =>
       val phaseAngle = PiPi * i / period
-
       sineF(phaseAngle).toByte
     }.toArray
   }
@@ -121,7 +120,6 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   }
   def mkSquareWave(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
-
     (0 to noOfSamples).map { i =>
       val phaseAngle = PiPi * i * freq / sampleRate
       sine(phaseAngle).sign * maxVol
@@ -159,7 +157,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   def drain(): Unit = line.drain()
   def silence(lenMs: Int): Unit =
     play(mkSilenceBuffer(lenMs))
-  def tone(freq: Int, lenMs: Int): Unit =
+  def sine(freq: Int, lenMs: Int): Unit =
     play(mkSineWaveBuffer(freq, lenMs))
   def pulse(freq: Int, lenMs: Int, rampTimeMs: Int = 100) =
     play(mkSineWavePulseBuffer(freq, lenMs, rampTimeMs))
@@ -210,49 +208,63 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
-      if (args.contains("-i")) {
+      if (args.contains("-r")) {
         println("type cmd and press enter (/ex to quit)")
         while (true) {
           val line = Console.in.readLine()
           if (line == "/ex")
             System.exit(0)
           else line match {
-            case "s" =>
-              audioSynth.tone(1000, 5000)
-            case "t" =>
-              audioSynth.tri(1000, 5000)
-            case "w" =>
-              audioSynth.saw(1000, 5000)
-            case "n" =>
-              audioSynth.noise(5000)  
-            case _ =>
+            case s"sine $freq $duration" =>
+              audioSynth.sine(freq.toInt, duration.toInt)
+            case s"tri $freq $duration" =>
+              audioSynth.tri(freq.toInt, duration.toInt)
+            case s"saw $freq $duration" =>
+              audioSynth.saw(freq.toInt, duration.toInt)
+            case s"sqr $freq $duration" =>
+              audioSynth.square(freq.toInt, duration.toInt)
+            case s"noise $duration" =>
+              audioSynth.noise(duration.toInt)  
+            case s"sweep $f1 $f2 $steps $lenMs" =>
+              audioSynth.sweep(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+            case s"blip $f1 $f2 $steps $lenMs" =>
+              audioSynth.blip(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+            case s"rnd $f1 $f2 $steps $lenMs" =>
+              audioSynth.randomTones(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+            case s"blipSweep $f1 $f2 $f3 $steps $subSteps $lenMs" =>
+              audioSynth.blipSweep(f1.toInt, f2.toInt, f3.toInt, steps.toInt, subSteps.toInt, lenMs.toInt)
+            case _ => println("syntax error")
           }
           audioSynth.silence(250)
         }
       }
       else {
+        val cs = ChromaticScale()
+        (1 to 13).foreach( n => audioSynth.sine(cs.freq(n), 100))
+        (1 to -13 by -1).foreach( n => audioSynth.sine(cs.freq(n), 100))
+
         val sineAb = audioSynth.mkSineWaveBuffer(1000, 1000)
         audioSynth.save("wav/sine-1kHz.wav", sineAb)
         val triAb = audioSynth.mkTriWave(1000, 1000)
         audioSynth.save("wav/tri-1kHz.wav", triAb)
 
         audioSynth.pulse(1000, 5000, 2000)
-        audioSynth.tone(500, 1000)
+        audioSynth.sine(500, 1000)
         audioSynth.square(500, 1000)
         audioSynth.saw(500, 1000)
         audioSynth.tri(500, 1000)
         // check is relatively free of zc noise
         (1 to 50).foreach { i =>
-          audioSynth.tone(950+i, 50-i/3)
+          audioSynth.sine(950+i, 50-i/3)
         }
         audioSynth.blipSweep(500, 2500, 200, 100, 4, 5000)
-        audioSynth.tone(100, 1000)
+        audioSynth.sine(100, 1000)
         audioSynth.square(1000, 1000)
         audioSynth.square(400, 1000)
-        audioSynth.tone(1000, 1000)
-        audioSynth.tone(750, 1000)
-        audioSynth.tone(700, 900)
-        audioSynth.tone(500, 500)
+        audioSynth.sine(1000, 1000)
+        audioSynth.sine(750, 1000)
+        audioSynth.sine(700, 900)
+        audioSynth.sine(500, 500)
         audioSynth.tone3(1000, 1000)
         audioSynth.blip(500, 1000, 100, 4000)
         audioSynth.sweep(400, 1600, 5, 4000)
@@ -275,4 +287,16 @@ object SynthDemo {
       }
     }
   }
+}
+
+object Pitches {
+  case class Note(freq: Int)
+  val A1 = Note(440)
+}
+import Pitches._
+case class ChromaticScale(baseFreq: Int = A1.freq) {
+  import Math._
+  val ratio = pow(2, 1.0/12)
+  def freq(note: Int) =
+    (baseFreq * pow(ratio, note-1)).toInt
 }

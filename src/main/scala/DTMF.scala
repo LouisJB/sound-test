@@ -90,7 +90,7 @@ object DTMFDemo {
           audioSynth.silence(4000)
         }
       }
-      else if (args.contains("-i")) {
+      else if (args.contains("-r")) {
         while (true) {
           println("type dial string and press enter (/ex to quit)")
           val text = Console.in.readLine()
