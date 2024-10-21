@@ -201,6 +201,24 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       play(audioBuffer)
     }
   }
+  def chromaticSweep(minNote: Int, maxNote: Int, step: Int, durMs: Int) = {
+    val cs = ChromaticScale()
+    (minNote to maxNote).by(step).foreach( n => sine(cs.freq(n), durMs))
+  }
+  def chromaticSweepUpDown(minNote: Int, maxNote: Int, step: Int, durMs: Int) = {
+    chromaticSweep(minNote, maxNote, step, durMs)
+    chromaticSweep(maxNote, minNote, step * -1, durMs)
+  }
+  def playSeq(scale: Scale, noteSeq: Array[Int], durMs: Int, gapMs: Int = 0) =
+    noteSeq.foreach(nn => { sine(scale.freq(nn), durMs); silence(gapMs) })
+  def playSeqOpt(scale: Scale, noteSeq: Array[Option[Int]], durMs: Int, gapMs: Int = 0) =
+    noteSeq.foreach( _ match {
+      case Some(nn) =>
+        sine(scale.freq(nn), durMs)
+      case None =>
+        silence(durMs)
+      silence(gapMs)
+  })
   def stop() = AudioSynth.stopDataLine(line)
 }
 
@@ -239,49 +257,60 @@ object SynthDemo {
         }
       }
       else {
+        import audioSynth._
+        val sineAb = mkSineWaveBuffer(1000, 1000)
+        save("wav/sine-1kHz.wav", sineAb)
+        val triAb = mkTriWave(1000, 1000)
+        save("wav/tri-1kHz.wav", triAb)
+
         val cs = ChromaticScale()
-        (1 to 13).foreach( n => audioSynth.sine(cs.freq(n), 100))
-        (1 to -13 by -1).foreach( n => audioSynth.sine(cs.freq(n), 100))
+        playSeqOpt(cs,
+          Array(
+            Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
+            Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
+        ),
+        200, 50)
 
-        val sineAb = audioSynth.mkSineWaveBuffer(1000, 1000)
-        audioSynth.save("wav/sine-1kHz.wav", sineAb)
-        val triAb = audioSynth.mkTriWave(1000, 1000)
-        audioSynth.save("wav/tri-1kHz.wav", triAb)
+        playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
+        chromaticSweepUpDown(-13, 13, 1, 100)
+        chromaticSweep(1, 13, 1, 100)
+        chromaticSweep(1, -13, -1, 100)
+        chromaticSweep(-26, 26, 1, 50)
 
-        audioSynth.pulse(1000, 5000, 2000)
-        audioSynth.sine(500, 1000)
-        audioSynth.square(500, 1000)
-        audioSynth.saw(500, 1000)
-        audioSynth.tri(500, 1000)
+        pulse(1000, 5000, 2000)
+        sine(500, 1000)
+        square(500, 1000)
+        saw(500, 1000)
+        tri(500, 1000)
         // check is relatively free of zc noise
         (1 to 50).foreach { i =>
-          audioSynth.sine(950+i, 50-i/3)
+          sine(950+i, 50-i/3)
         }
-        audioSynth.blipSweep(500, 2500, 200, 100, 4, 5000)
-        audioSynth.sine(100, 1000)
-        audioSynth.square(1000, 1000)
-        audioSynth.square(400, 1000)
-        audioSynth.sine(1000, 1000)
-        audioSynth.sine(750, 1000)
-        audioSynth.sine(700, 900)
-        audioSynth.sine(500, 500)
-        audioSynth.tone3(1000, 1000)
-        audioSynth.blip(500, 1000, 100, 4000)
-        audioSynth.sweep(400, 1600, 5, 4000)
-        audioSynth.blip(200, 800, 25, 5000)
-        audioSynth.sweep(1600, 200, -3, 4000)
+        blipSweep(500, 2500, 200, 100, 4, 5000)
+        sine(100, 1000)
+        square(1000, 1000)
+        square(400, 1000)
+        sine(1000, 1000)
+        sine(750, 1000)
+        sine(700, 900)
+        sine(500, 500)
+        tone3(1000, 1000)
+        blip(500, 1000, 100, 4000)
+        sweep(400, 1600, 5, 4000)
+        blip(200, 800, 25, 5000)
+        sweep(1600, 200, -3, 4000)
         (1 to 10).foreach { i => 
-          audioSynth.noise(1000/i)
-          audioSynth.drain()
+          noise(1000/i)
+          drain()
           Thread.sleep(1000/(11-i))
         }
-        audioSynth.randomTones(200, 1000, 20, 5000)
-        audioSynth.sweep(3200, 300, -10, 5000)
+        randomTones(200, 1000, 20, 5000)
+        sweep(3200, 300, -10, 5000)
 
         DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
         Thread.sleep(1000)
         (1 to 2).foreach { _ =>
-          audioSynth.blip(1500, 1900, 10, 2000)
+          blip(1500, 1900, 10, 2000)
           Thread.sleep(4000)
         }
       }
@@ -290,13 +319,20 @@ object SynthDemo {
 }
 
 object Pitches {
+  import Math._
   case class Note(freq: Int)
   val A1 = Note(440)
+
+  val semitoneRatio = pow(2, 1.0/12)
+  val wholetomeRatio = pow(2, 1.0/6)
 }
 import Pitches._
-case class ChromaticScale(baseFreq: Int = A1.freq) {
+trait Scale {
+  def freq(note: Int): Int
+}
+case class ChromaticScale(baseFreq: Int = A1.freq) extends Scale {
   import Math._
-  val ratio = pow(2, 1.0/12)
-  def freq(note: Int) =
+  val ratio = semitoneRatio
+  def freq(note: Int): Int =
     (baseFreq * pow(ratio, note-1)).toInt
 }
