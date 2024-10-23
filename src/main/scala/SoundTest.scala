@@ -11,6 +11,7 @@ import javax.sound.sampled.TargetDataLine
 import javax.sound.sampled.DataLine
 import java.io.ByteArrayInputStream
 
+
 object AudioConsts {
   val defaultSampleRate = 96 * 1000
   val defaultBitDepth = 8
@@ -142,6 +143,15 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
         ((4.0 * (PiPi / 2 - phaseAngle) / PiPi) + 1.0) * maxVol
     }.map(_.toByte).toArray
   }
+  // pwnVal is a percentage 1-99 value (0 and 100 produce DC and are out of bounds)
+  def mkPwmWave(freq: Double, pwmVal: Int, lenMs: Int) = {
+    val pwm = Math.min(99, max(1, pwmVal))
+    val samplesPerWave = sampleRate / freq
+    val pwmLength = ((pwm / 100.0) * samplesPerWave)
+    (0 to sampleLength(freq, lenMs)).map { i =>
+      if (i % samplesPerWave < pwmLength) maxVol else -1.0 * maxVol
+    }.map(_.toByte).toArray
+  }
   def play(ab: Array[Byte]) = line.write(ab, 0, ab.length)
   def save(path: String, ab : Array[Byte]) = {
     // preset to mono wav for now
@@ -169,6 +179,8 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     play(mkSawWave(freq, lenMs))
   def tri(freq: Int, lenMs: Int): Unit =
     play(mkTriWave(freq, lenMs))
+  def pwm(freq: Int, pwm: Int, lenMs: Int): Unit =
+    play(mkPwmWave(freq, pwm, lenMs))
   def sweep(f1: Int, f2: Int, steps: Int, lenMs: Int) : Unit = {
     val dur = lenMs / ((f2 - f1) / steps)
     (f1 to f2).by(steps).foreach { freq =>
@@ -226,6 +238,7 @@ object SynthDemo {
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
+      import audioSynth._
       if (args.contains("-r")) {
         println("type cmd and press enter (/ex to quit)")
         while (true) {
@@ -234,34 +247,43 @@ object SynthDemo {
             System.exit(0)
           else line match {
             case s"sine $freq $duration" =>
-              audioSynth.sine(freq.toInt, duration.toInt)
+              sine(freq.toInt, duration.toInt)
             case s"tri $freq $duration" =>
-              audioSynth.tri(freq.toInt, duration.toInt)
+              tri(freq.toInt, duration.toInt)
             case s"saw $freq $duration" =>
-              audioSynth.saw(freq.toInt, duration.toInt)
+              saw(freq.toInt, duration.toInt)
             case s"sqr $freq $duration" =>
-              audioSynth.square(freq.toInt, duration.toInt)
+              square(freq.toInt, duration.toInt)
             case s"noise $duration" =>
-              audioSynth.noise(duration.toInt)  
+              noise(duration.toInt)  
             case s"sweep $f1 $f2 $steps $lenMs" =>
-              audioSynth.sweep(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+              sweep(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
             case s"blip $f1 $f2 $steps $lenMs" =>
-              audioSynth.blip(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+              blip(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
             case s"rnd $f1 $f2 $steps $lenMs" =>
-              audioSynth.randomTones(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+              randomTones(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
+            case s"pwm $freq $pwmVal $lenMs" =>
+              pwm(freq.toInt, pwmVal.toInt, lenMs.toInt)
             case s"blipSweep $f1 $f2 $f3 $steps $subSteps $lenMs" =>
-              audioSynth.blipSweep(f1.toInt, f2.toInt, f3.toInt, steps.toInt, subSteps.toInt, lenMs.toInt)
+              blipSweep(f1.toInt, f2.toInt, f3.toInt, steps.toInt, subSteps.toInt, lenMs.toInt)
             case _ => println("syntax error")
           }
           audioSynth.silence(250)
         }
       }
       else {
-        import audioSynth._
+        (1 to 99).foreach ( p => 
+          pwm(1000, p, 100)
+        )
+
         val sineAb = mkSineWaveBuffer(1000, 1000)
         save("wav/sine-1kHz.wav", sineAb)
         val triAb = mkTriWave(1000, 1000)
         save("wav/tri-1kHz.wav", triAb)
+        val pwm50Ab = mkPwmWave(1000, 50, 1000)
+        save("wav/pwm-50-1kHz.wav", pwm50Ab)
+
+        System.exit(0)
 
         val cs = ChromaticScale()
         playSeqOpt(cs,
