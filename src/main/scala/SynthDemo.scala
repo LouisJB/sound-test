@@ -38,10 +38,18 @@ object SynthDemo {
         }
       }
       else {
-        (1 to 99).foreach ( p => 
+        // examples of PWM sweeping
+        (1 to 99).foreach ( p =>
           pwm(1000, p, 100)
         )
 
+        (1 to 99).foreach ( p =>
+          play(ws.mkPwmWave(440, p, 100).zip(
+            ws.mkPwmWave(880 * 1.5, (p + 50) % 99, 100)).map { case (a, b) => (a.toDouble + b.toDouble / 2.0).toByte }
+          )
+        )
+
+        // wave gen, wave file generation and saving
         val sineAb = ws.mkSineWaveBuffer(1000, 1000)
         save("wav/sine-1kHz.wav", sineAb)
         val triAb = ws.mkTriWave(1000, 1000)
@@ -49,8 +57,7 @@ object SynthDemo {
         val pwm50Ab = ws.mkPwmWave(1000, 50, 1000)
         save("wav/pwm-50-1kHz.wav", pwm50Ab)
 
-        System.exit(0)
-
+        // some simple scala sequences
         val cs = ChromaticScale()
         playSeqOpt(cs,
           Array(
@@ -60,17 +67,20 @@ object SynthDemo {
         200, 50)
 
         playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
+
+        // play chromatic scale notes
         chromaticSweepUpDown(-13, 13, 1, 100)
         chromaticSweep(1, 13, 1, 100)
         chromaticSweep(1, -13, -1, 100)
         chromaticSweep(-26, 26, 1, 50)
 
+        // selection of tone/wave demos
         pulse(1000, 5000, 2000)
         sine(500, 1000)
         square(500, 1000)
         saw(500, 1000)
         tri(500, 1000)
-        // check is relatively free of zc noise
+        // pitch shift, check is relatively free of zc noise
         (1 to 50).foreach { i =>
           sine(950+i, 50-i/3)
         }
@@ -95,6 +105,7 @@ object SynthDemo {
         randomTones(200, 1000, 20, 5000)
         sweep(3200, 300, -10, 5000)
 
+        // DTMF demo, see DTMF for full example
         DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
         Thread.sleep(1000)
         (1 to 2).foreach { _ =>
