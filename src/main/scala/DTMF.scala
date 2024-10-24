@@ -22,8 +22,8 @@ case class DTMF(as: AudioSynth, lengthMs: Int = defaultLengthMs, digitGapMs: Int
 
   def mkTones(key: Key, lenMs: Int = lengthMs) = {
     val (f1, f2) = key.freqs 
-    val tone1 = as.mkSineWaveBuffer(f1, lenMs).toSeq
-    val tone2 = as.mkSineWaveBuffer(f2, lenMs).toSeq
+    val tone1 = as.ws.mkSineWaveBuffer(f1, lenMs).toSeq
+    val tone2 = as.ws.mkSineWaveBuffer(f2, lenMs).toSeq
     val tones = tone1.zipAll(tone2, 0:Byte, 0:Byte).map { case (w1, w2) =>
       ((w1.toDouble + w2.toDouble) / 2).toByte
     }.toArray

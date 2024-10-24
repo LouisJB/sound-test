@@ -5,12 +5,11 @@ import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.LineUnavailableException
 import javax.sound.sampled.SourceDataLine
 import javax.sound.sampled.AudioFileFormat
-import java.io.File
 import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.TargetDataLine
 import javax.sound.sampled.DataLine
 import java.io.ByteArrayInputStream
-
+import java.io.File
 
 object AudioConsts {
   val defaultSampleRate = 96 * 1000
@@ -22,38 +21,8 @@ object Debug {
   def debug(s: String) = if (enabled)
     println(s)
 }
-object AudioSynth {
-  println("AudioSynthi v0.1")
-  def mkDataLine(sampleRate: Int, bitDepth: Int, bufferSize: Int = AudioConsts.defaultBufferSize): SourceDataLine  = {
-    val af : AudioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
-    val line : SourceDataLine = AudioSystem.getSourceDataLine(af)
-    line.open(af, bufferSize)
-    line.start()
-    println(line.getLineInfo())
-    println(line.getFormat())
-    line
-  }
-  def stopDataLine(line: SourceDataLine) = {
-    line.drain()
-    line.stop()
-    line.close()
-  }
-  def mkAudioSynth(sampleRate: Int, bitDepth: Int) =
-    AudioSynth(mkDataLine(sampleRate, bitDepth), sampleRate, bitDepth)
-  def withDataLine(sampleRate: Int, bitDepth: Int)(fn: SourceDataLine => Unit): Unit = {
-    val line = mkDataLine(sampleRate, bitDepth)
-    fn(line)
-    stopDataLine(line)
-  }
-  def withAudioSynth(sampleRate: Int = AudioConsts.defaultSampleRate,
-                     bitDepth: Int = AudioConsts.defaultBitDepth)(fn: AudioSynth => Unit): Unit = {
-    withDataLine(sampleRate, bitDepth) { line =>
-      val as = AudioSynth(line, sampleRate, bitDepth)
-      fn(as)
-    }
-  }
-}
-case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
+// creates waveforms in sampled PCM format
+case class WaveSynth(sampleRate: Int, bitDepth: Int) {
   import Math._
   import Debug._
   val PiPi = Math.PI * 2.0
@@ -152,6 +121,11 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       if (i % samplesPerWave < pwmLength) maxVol else -1.0 * maxVol
     }.map(_.toByte).toArray
   }
+}
+// sythesizer source that can play to supplied audio line
+case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
+  val ws = WaveSynth(sampleRate, bitDepth)
+  import ws._
   def play(ab: Array[Byte]) = line.write(ab, 0, ab.length)
   def save(path: String, ab : Array[Byte]) = {
     // preset to mono wav for now
@@ -209,8 +183,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val rand = new scala.util.Random
     (1 to steps).foreach { _ =>
       val freq = rand.nextDouble() * (f2-f1) + f1
-      val audioBuffer = mkSineWaveBuffer(freq.toInt, dur)
-      play(audioBuffer)
+      play(mkSineWaveBuffer(freq.toInt, dur))
     }
   }
   def chromaticSweep(minNote: Int, maxNote: Int, step: Int, durMs: Int) = {
@@ -233,128 +206,34 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   })
   def stop() = AudioSynth.stopDataLine(line)
 }
-
-object SynthDemo {
-  import AudioConsts._
-  def main(args: Array[String]): Unit = {
-    AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
-      import audioSynth._
-      if (args.contains("-r")) {
-        println("type cmd and press enter (/ex to quit)")
-        while (true) {
-          val line = Console.in.readLine()
-          if (line == "/ex")
-            System.exit(0)
-          else line match {
-            case s"sine $freq $duration" =>
-              sine(freq.toInt, duration.toInt)
-            case s"tri $freq $duration" =>
-              tri(freq.toInt, duration.toInt)
-            case s"saw $freq $duration" =>
-              saw(freq.toInt, duration.toInt)
-            case s"sqr $freq $duration" =>
-              square(freq.toInt, duration.toInt)
-            case s"noise $duration" =>
-              noise(duration.toInt)  
-            case s"sweep $f1 $f2 $steps $lenMs" =>
-              sweep(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
-            case s"blip $f1 $f2 $steps $lenMs" =>
-              blip(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
-            case s"rnd $f1 $f2 $steps $lenMs" =>
-              randomTones(f1.toInt, f2.toInt, steps.toInt, lenMs.toInt)
-            case s"pwm $freq $pwmVal $lenMs" =>
-              pwm(freq.toInt, pwmVal.toInt, lenMs.toInt)
-            case s"blipSweep $f1 $f2 $f3 $steps $subSteps $lenMs" =>
-              blipSweep(f1.toInt, f2.toInt, f3.toInt, steps.toInt, subSteps.toInt, lenMs.toInt)
-            case _ => println("syntax error")
-          }
-          audioSynth.silence(250)
-        }
-      }
-      else {
-        (1 to 99).foreach ( p => 
-          pwm(1000, p, 100)
-        )
-
-        val sineAb = mkSineWaveBuffer(1000, 1000)
-        save("wav/sine-1kHz.wav", sineAb)
-        val triAb = mkTriWave(1000, 1000)
-        save("wav/tri-1kHz.wav", triAb)
-        val pwm50Ab = mkPwmWave(1000, 50, 1000)
-        save("wav/pwm-50-1kHz.wav", pwm50Ab)
-
-        System.exit(0)
-
-        val cs = ChromaticScale()
-        playSeqOpt(cs,
-          Array(
-            Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
-            Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
-        ),
-        200, 50)
-
-        playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
-        chromaticSweepUpDown(-13, 13, 1, 100)
-        chromaticSweep(1, 13, 1, 100)
-        chromaticSweep(1, -13, -1, 100)
-        chromaticSweep(-26, 26, 1, 50)
-
-        pulse(1000, 5000, 2000)
-        sine(500, 1000)
-        square(500, 1000)
-        saw(500, 1000)
-        tri(500, 1000)
-        // check is relatively free of zc noise
-        (1 to 50).foreach { i =>
-          sine(950+i, 50-i/3)
-        }
-        blipSweep(500, 2500, 200, 100, 4, 5000)
-        sine(100, 1000)
-        square(1000, 1000)
-        square(400, 1000)
-        sine(1000, 1000)
-        sine(750, 1000)
-        sine(700, 900)
-        sine(500, 500)
-        tone3(1000, 1000)
-        blip(500, 1000, 100, 4000)
-        sweep(400, 1600, 5, 4000)
-        blip(200, 800, 25, 5000)
-        sweep(1600, 200, -3, 4000)
-        (1 to 10).foreach { i => 
-          noise(1000/i)
-          drain()
-          Thread.sleep(1000/(11-i))
-        }
-        randomTones(200, 1000, 20, 5000)
-        sweep(3200, 300, -10, 5000)
-
-        DTMF(audioSynth).play("T  001 718 8675309 # RSRSR")
-        Thread.sleep(1000)
-        (1 to 2).foreach { _ =>
-          blip(1500, 1900, 10, 2000)
-          Thread.sleep(4000)
-        }
-      }
+object AudioSynth {
+  println("AudioSynthi v0.1")
+  def mkDataLine(sampleRate: Int, bitDepth: Int, bufferSize: Int = AudioConsts.defaultBufferSize): SourceDataLine  = {
+    val af : AudioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
+    val line : SourceDataLine = AudioSystem.getSourceDataLine(af)
+    line.open(af, bufferSize)
+    line.start()
+    println(line.getLineInfo())
+    println(line.getFormat())
+    line
+  }
+  def stopDataLine(line: SourceDataLine) = {
+    line.drain()
+    line.stop()
+    line.close()
+  }
+  def mkAudioSynth(sampleRate: Int, bitDepth: Int) =
+    AudioSynth(mkDataLine(sampleRate, bitDepth), sampleRate, bitDepth)
+  def withDataLine(sampleRate: Int, bitDepth: Int)(fn: SourceDataLine => Unit): Unit = {
+    val line = mkDataLine(sampleRate, bitDepth)
+    fn(line)
+    stopDataLine(line)
+  }
+  def withAudioSynth(sampleRate: Int = AudioConsts.defaultSampleRate,
+                     bitDepth: Int = AudioConsts.defaultBitDepth)(fn: AudioSynth => Unit): Unit = {
+    withDataLine(sampleRate, bitDepth) { line =>
+      val as = AudioSynth(line, sampleRate, bitDepth)
+      fn(as)
     }
   }
-}
-
-object Pitches {
-  import Math._
-  case class Note(freq: Int)
-  val A1 = Note(440)
-
-  val semitoneRatio = pow(2, 1.0/12)
-  val wholetomeRatio = pow(2, 1.0/6)
-}
-import Pitches._
-trait Scale {
-  def freq(note: Int): Int
-}
-case class ChromaticScale(baseFreq: Int = A1.freq) extends Scale {
-  import Math._
-  val ratio = semitoneRatio
-  def freq(note: Int): Int =
-    (baseFreq * pow(ratio, note-1)).toInt
 }
