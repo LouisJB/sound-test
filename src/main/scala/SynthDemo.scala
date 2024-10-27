@@ -38,6 +38,9 @@ object SynthDemo {
         }
       }
       else {
+        // example modulate 1 wave by another
+        play(ws.modulate(ws.mkTriWave(1000, 2000), ws.mkSineWave(5, 2000)))
+
         // examples of PWM sweeping
         (1 to 99).foreach ( p =>
           pwm(1000, p, 100)
@@ -50,7 +53,7 @@ object SynthDemo {
         )
 
         // wave gen, wave file generation and saving
-        val sineAb = ws.mkSineWaveBuffer(1000, 1000)
+        val sineAb = ws.mkSineWave(1000, 1000)
         save("wav/sine-1kHz.wav", sineAb)
         val triAb = ws.mkTriWave(1000, 1000)
         save("wav/tri-1kHz.wav", triAb)
@@ -58,6 +61,8 @@ object SynthDemo {
         save("wav/pwm-50-1kHz.wav", pwm50Ab)
 
         // some simple scala sequences
+        val player = Player(audioSynth)
+        import player._
         val cs = ChromaticScale()
         playSeqOpt(cs,
           Array(
@@ -65,8 +70,17 @@ object SynthDemo {
             Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
         ),
         200, 50)
-
         playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
+
+        val bpm = Durations(100)
+        val notes = Seq(
+            Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
+            Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
+        ).map {
+          case Some(nn) =>
+            Note(cs.freq(nn), bpm.quarter)
+          case None => Rest(bpm.quarter)
+        }
 
         // play chromatic scale notes
         chromaticSweepUpDown(-13, 13, 1, 100)

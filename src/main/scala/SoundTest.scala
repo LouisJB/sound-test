@@ -44,11 +44,11 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
     val f3 = sin(phaseAngle * 3)
     (f1 * maxVol * 0.7) + (f3 * maxVol * 0.3)
   }
-  def mkSilenceBuffer(lenMs: Int) = {
+  def mkSilence(lenMs: Int) = {
     val noOfSamples = lenMs * sampleRate / 1000
     (0 to noOfSamples).map(_ => (0).toByte).toArray
   }
-  def mkSineWaveBuffer(freq: Double, lenMs: Int) = {
+  def mkSineWave(freq: Double, lenMs: Int) = {
     val noOfSamples = sampleLength(freq, lenMs)
     val waveBuffer = (0 to noOfSamples).map { i =>
       val phaseAngle = PiPi * i * freq / sampleRate
@@ -59,8 +59,8 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
     waveBuffer
   }
   // simple symetrical attack/decay rise/fall times
-  def mkSineWavePulseBuffer(freq: Double, lenMs: Int, rampTimeMs: Int = 100) = {
-    val waveBufferRaw = mkSineWaveBuffer(freq, lenMs)
+  def mkSineWavePulse(freq: Double, lenMs: Int, rampTimeMs: Int = 100) = {
+    val waveBufferRaw = mkSineWave(freq, lenMs)
     val noOfSamples = waveBufferRaw.length
     val rampLength = sampleRate * rampTimeMs / 1000.0
     val waveBuffer = waveBufferRaw.zipWithIndex.map { case (s, i) =>
@@ -73,15 +73,15 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
     debug(waveBuffer.toSeq.drop(noOfSamples - 50).mkString(", "))
     waveBuffer
   }
-  def mkWaveBuffer(freq: Double, lenMs: Int, sineF : Double => Double = sine3) = {
+  def mkWave(freq: Double, lenMs: Int, waveFn : Double => Double = sine3) = {
     val period = sampleRate / freq
     val noOfSamples = sampleLength(freq, lenMs)
     (0 to noOfSamples).map { i =>
       val phaseAngle = PiPi * i / period
-      sineF(phaseAngle).toByte
+      waveFn(phaseAngle).toByte
     }.toArray
   }
-  def mkNoiseBuffer(lenMs: Int) = {
+  def mkNoiseWave(lenMs: Int) = {
     val rand = new scala.util.Random
     val noOfSamples = (lenMs * sampleRate) / 1000
     (0 to noOfSamples).map { i =>
@@ -121,6 +121,19 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
       if (i % samplesPerWave < pwmLength) maxVol else -1.0 * maxVol
     }.map(_.toByte).toArray
   }
+
+  def mult(as: Array[Byte], bs: Array[Byte]) =
+    as.zipAll(bs, 0.toByte, 0.toByte).map { (a, b) => (a.toDouble * b.toDouble).toByte }
+
+  def mult(as: Array[Byte], bs: Array[Double]) =
+    as.zipAll(bs, 0.toByte, 1.toDouble).map { (a, b) => (a.toDouble * b).toByte }
+
+  // rescale byte wave as a 0.0 .. 1.0 modulation signal
+  def scale(as: Array[Byte]): Array[Double] =
+    as.map(a => (a.toDouble - Byte.MinValue) / 255.0)
+
+  def modulate(as: Array[Byte], mod: Array[Byte]) =
+    mult(as, scale(mod))
 }
 // sythesizer source that can play to supplied audio line
 case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
@@ -140,13 +153,13 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   }
   def drain(): Unit = line.drain()
   def silence(lenMs: Int): Unit =
-    play(mkSilenceBuffer(lenMs))
+    play(mkSilence(lenMs))
   def sine(freq: Int, lenMs: Int): Unit =
-    play(mkSineWaveBuffer(freq, lenMs))
+    play(mkSineWave(freq, lenMs))
   def pulse(freq: Int, lenMs: Int, rampTimeMs: Int = 100) =
-    play(mkSineWavePulseBuffer(freq, lenMs, rampTimeMs))
+    play(mkSineWavePulse(freq, lenMs, rampTimeMs))
   def tone3(freq: Int, lenMs: Int): Unit =
-    play(mkWaveBuffer(freq, lenMs))
+    play(mkWave(freq, lenMs))
   def square(freq: Int, lenMs: Int): Unit =
     play(mkSquareWave(freq, lenMs))
   def saw(freq: Int, lenMs: Int): Unit =
@@ -158,15 +171,15 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
   def sweep(f1: Int, f2: Int, steps: Int, lenMs: Int) : Unit = {
     val dur = lenMs / ((f2 - f1) / steps)
     (f1 to f2).by(steps).foreach { freq =>
-      play(mkSineWaveBuffer(freq, dur))
+      play(mkSineWave(freq, dur))
     }
   }
   def noise(lenMs: Int) : Unit =
-    play(mkNoiseBuffer(lenMs))
+    play(mkNoiseWave(lenMs))
   def blip(f1: Int, f2: Int, steps: Int, lenMs: Int): Unit = {
     val durMs = lenMs / steps / 2
-    val audioBuffer1 = mkSineWaveBuffer(f1, durMs)
-    val audioBuffer2 = mkSineWaveBuffer(f2, durMs)
+    val audioBuffer1 = mkSineWave(f1, durMs)
+    val audioBuffer2 = mkSineWave(f2, durMs)
     (1 to steps).foreach { _ =>
       play(audioBuffer1)
       play(audioBuffer2)
@@ -183,28 +196,38 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     val rand = new scala.util.Random
     (1 to steps).foreach { _ =>
       val freq = rand.nextDouble() * (f2-f1) + f1
-      play(mkSineWaveBuffer(freq.toInt, dur))
+      play(mkSineWave(freq.toInt, dur))
     }
   }
   def chromaticSweep(minNote: Int, maxNote: Int, step: Int, durMs: Int) = {
     val cs = ChromaticScale()
-    (minNote to maxNote).by(step).foreach( n => sine(cs.freq(n), durMs))
+    (minNote to maxNote).by(step).foreach( n => sine(cs.freq(n).toInt, durMs))
   }
   def chromaticSweepUpDown(minNote: Int, maxNote: Int, step: Int, durMs: Int) = {
     chromaticSweep(minNote, maxNote, step, durMs)
     chromaticSweep(maxNote, minNote, step * -1, durMs)
   }
+  def stop() = AudioSynth.stopDataLine(line)
+}
+case class Player(as: AudioSynth) {
+  import as._
   def playSeq(scale: Scale, noteSeq: Array[Int], durMs: Int, gapMs: Int = 0) =
-    noteSeq.foreach(nn => { sine(scale.freq(nn), durMs); silence(gapMs) })
+    noteSeq.foreach(nn => { sine(scale.freq(nn).toInt, durMs); silence(gapMs) })
   def playSeqOpt(scale: Scale, noteSeq: Array[Option[Int]], durMs: Int, gapMs: Int = 0) =
     noteSeq.foreach( _ match {
       case Some(nn) =>
-        sine(scale.freq(nn), durMs)
+        sine(scale.freq(nn).toInt, durMs)
       case None =>
         silence(durMs)
       silence(gapMs)
   })
-  def stop() = AudioSynth.stopDataLine(line)
+  def playSeq(noteSeq: Seq[Notes], playF: (Double, Double) => Array[Byte]) =
+    noteSeq.foreach( _ match {
+      case Note(f, durMs) =>
+        playF(f.toInt, durMs.toInt)
+      case Rest(durMs) =>
+        silence(durMs.toInt)
+  })
 }
 object AudioSynth {
   println("AudioSynthi v0.1")
