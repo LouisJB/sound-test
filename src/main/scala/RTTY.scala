@@ -1,14 +1,14 @@
 package Audio
 
 case class RTTY(audioSynth: AudioSynth,
-                baudRade: Double = defaultBaaudRate,
+                baudRate: Double = defaultBaudRate,
                 spacePitch: Int = defaultSpacePitch,
                 markPitch: Int = defaulMarkPitch,
                 stopBits: StopBits = defaultStopBits) {
   import BaudotCodes._
   println(s"RTTY v0.1 : Initialized - spacePitch: $spacePitch, markPitch: $markPitch, stopBits: $stopBits")
 
-  val bitDurMs = (60 * 1000 / baudRade).toInt
+  val bitDurMs = (1000 / baudRate).toInt
   def play(msg: String): Unit = {
     msg.map( c =>
       if (c.isLetter)
@@ -37,7 +37,7 @@ case object OneAndHalfStopBit extends StopBits { def stopBit = 1.5 }
 case object TwoStopBit extends StopBits { def stopBit = 2.0 }
 
 object RTTY {
-  val defaultBaaudRate = 45.45
+  val defaultBaudRate = 45.45
   val defaultSpacePitch = 2125 // Hz
   val defaulMarkPitch = 2295
   val defaultStopBits = OneStopBit
@@ -67,6 +67,9 @@ object BaudotCodes {
   val C = BaudotCode("C", "+-++-")
   val D = BaudotCode("D", "++++-")
   val E = BaudotCode("E", "-+---")
+  val F = BaudotCode("F", "-+++-")
+  val G = BaudotCode("G", "-+-+-")
+  val H = BaudotCode("G", "++-+-")
 
   val codes = Seq(A, B, C, D, E)
   val codeMap = codes.map(ev => ev.symbol-> ev).toMap
