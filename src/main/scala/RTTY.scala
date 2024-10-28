@@ -38,7 +38,7 @@ case class RTTY(audioSynth: AudioSynth,
     }
   }
   def play(msg: String): Unit = {
-    println(s"Message is : '$msg'")
+    println(s"Message is: '$msg'")
     play(NULL)
     (1 to noOfIdleSyncWords).foreach( _ => play(idleSyncWord))
     msg.toUpperCase().map( c => // note rtty baudot is case insensitive
@@ -59,7 +59,7 @@ case class RTTY(audioSynth: AudioSynth,
 
   def play(bc: BaudotCode): Unit = {
     val timeMs = System.currentTimeMillis()
-    print(s"$timeMs: output $bc |> ")
+    print(s"$timeMs = output $bc |> ")
     audioSynth.sine(spacePitch, bitDurMs) // start bit is a space
     bc.code.foreach( c =>
       print(c)
@@ -164,7 +164,7 @@ object BaudotCodes {
   val F1 = BaudotCode("1", "+++-+")
   val F2 = BaudotCode("2", "++--+")
   val F3 = BaudotCode("3", "+----")
-  val F4 = BaudotCode("4", "+-+--")
+  val F4 = BaudotCode("4", "-+-+-")
   val F5 = BaudotCode("5", "----+")
   val F6 = BaudotCode("6", "+-+-+")
   val F7 = BaudotCode("7", "+++--")
