@@ -134,6 +134,8 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
 
   def modulate(as: Array[Byte], mod: Array[Byte]) =
     mult(as, scale(mod))
+
+  def basicEg = EG(sampleRate)
 }
 // sythesizer source that can play to supplied audio line
 case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {

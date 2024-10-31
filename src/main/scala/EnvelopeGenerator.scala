@@ -24,13 +24,14 @@ case class EnvelopeSpecPercent(
 }
 
 case class EG(sampleRate: Int) {
+  import Debug._
   def eg(sampleLen: Int, attackLen: Int, decayLen: Int, sustainLevel: Double, releaseLen: Int) = {
     val sustainLen = (sampleLen - attackLen - decayLen - releaseLen).toInt
-    println(s"sampleLen:  $sampleLen")
-    println(s"attack len: $attackLen")
-    println(s"decay len: $decayLen")
-    println(s"sustain len: $sustainLen")
-    println(s"release len: $releaseLen")
+    debug(s"sampleLen:  $sampleLen")
+    debug(s"attack len: $attackLen")
+    debug(s"decay len: $decayLen")
+    debug(s"sustain len: $sustainLen")
+    debug(s"release len: $releaseLen")
     (0 until attackLen).map(x => (x / attackLen.toDouble)).toArray ++
     (0 until decayLen).map(x => 1.0 - (x * sustainLevel / decayLen.toDouble)) ++
     (0 until sustainLen).map(_ => sustainLevel) ++
