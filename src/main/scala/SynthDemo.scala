@@ -38,6 +38,20 @@ object SynthDemo {
         }
       }
       else {
+        // EG example
+        val eg = EG(ws.sampleRate)
+        val lenMs = 2500
+        play {
+          val es = EnvelopeSpec(1000.0, 500.0, .4, 500.0)
+          val egSignal = eg.mkEg(es, lenMs)
+          ws.mult(ws.mkSineWave(1200, lenMs), egSignal)
+        }
+        play {
+          val es = EnvelopeSpecPercent(30.0, 20.0, .4, 20.0)
+          val egSignal = eg.mkEg(es, lenMs)
+          ws.mult(ws.mkSineWave(1000, lenMs), egSignal)
+        }
+
         // example modulate 1 wave by another
         play(ws.modulate(ws.mkTriWave(1000, 2000), ws.mkSineWave(5, 2000)))
 
