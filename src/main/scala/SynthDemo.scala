@@ -42,14 +42,14 @@ object SynthDemo {
 
         // example multi-tone partial mixing with EG amplitude moduation
         play {
-          val lenMs = 4000
-          val es = EnvelopeSpec(1000.0, 250.0, .7, 250.0)
-          val egSignal = eg.mkEg(es, lenMs)
+          val lenMs = 5000
+          val egSignal = eg.mkEg(EnvelopeSpec(750.0, 250.0, .7, 250.0), lenMs)
           ws.mult(SimpleMixer.mix(Array(
-            Tone(ws.modulate(ws.mkTriWave(1000, lenMs), ws.mkSineWave(5, lenMs)), 0.8),
+            Tone(ws.modulate(ws.mkTriWave(1000, lenMs), ws.mkSineWave(5, lenMs)), 0.7),
             Tone(ws.mkSquareWave(2000, lenMs), 0.5),
             Tone(ws.mkSineWave(500, lenMs), 1.0),
-            Tone(ws.mkPwmWave(4000, 10, lenMs), 0.6)
+            Tone(ws.mkPwmWave(4000, 10, lenMs), 0.5),
+            Tone(ws.mult(ws.mkNoiseWave(lenMs), eg.mkEg(EnvelopeSpec(lenMs/2, lenMs/2, .0, .0), lenMs)), 0.6)
           )), egSignal)
         }
 

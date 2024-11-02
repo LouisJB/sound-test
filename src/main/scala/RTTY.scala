@@ -122,6 +122,7 @@ object RTTYDemo {
   }
 }
 
+// see https://en.wikipedia.org/wiki/Baudot_code#ITA2 for reference
 case class BaudotCode(symbol: String, code: String) {
   override def toString = s"symbol: $symbol, code: $code"
 }
