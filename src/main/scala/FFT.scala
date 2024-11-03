@@ -29,7 +29,7 @@ object Complex {
     Complex(cos(c.im), sin(c.im)) * r
   }
 }
-
+case class FTTBin(freq: Double, value: Complex)
 object FFT {
   import Complex._
   def _fft(cs: Seq[Complex], direction: Complex, scalar: Int): Seq[Complex] = {
@@ -80,9 +80,9 @@ case class FFT(sampleRate: Int, windowLen: Int) {
     wf.toSeq.map(re => Complex(re, 0))
   // will return the non-imaged freq bins with the frequency they represent in _1
   def doFft(wf: Seq[Complex]) =
-    FFT.fft(wf).take(windowLen/2).zipWithIndex.map { case (c, i) => (binFreq(i), c.re) }
-  def maxAmplitudeFreq(freqBins: Seq[(Double, Double)]) = {
-    freqBins.reduce { case (a @ (f1, re1), b @ (f2, re2)) => 
+    FFT.fft(wf).take(windowLen/2).zipWithIndex.map { case (c, i) => FTTBin(binFreq(i), c) }
+  def maxAmplitudeFreq(freqBins: Seq[FTTBin]) = {
+    freqBins.reduce { case (a @ FTTBin(f1, Complex(re1, _)), b @ FTTBin(f2, Complex(re2, _))) =>
       if (abs(re1) > abs(re2)) a else b
     }
   }
@@ -124,9 +124,13 @@ object FFTTest {
       val rawWf = ws.mkSineWave(freq, 2000 * windowLen / sampleRate)
       println(s"freq: $freq, wave sample len = " + rawWf.length)
       val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(rawWf))))
-      val diff = freq - maxFreqVal._1
-      println(s"freq: ${freq}Hz, max: ${maxFreqVal._1}Hz, difference: ${diff}Hz, binSize: ${binSizeHz}Hz")
+      val diff = freq - maxFreqVal.freq
+      println(s"freq: ${freq}Hz, max: ${maxFreqVal.freq}Hz, difference: ${diff}Hz, binSize: ${binSizeHz}Hz")
       maxFreqVal
     }
+
+    val dcWf = Array.tabulate(windowLen)(_ => 255.toByte)
+    val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(dcWf))))
+    println(s"DC signal found max: ${maxFreqVal.freq}Hz")
   }
 }
