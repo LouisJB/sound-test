@@ -4,11 +4,13 @@ import scala.math._
 
 // largely wholesale borrowed from rosettacode as a starting point
 case class Complex(re: Double, im: Double) {
-  def +(x: Complex): Complex = Complex(re + x.re, im + x.im)
-  def -(x: Complex): Complex = Complex(re - x.re, im - x.im)
-  def *(x: Double):  Complex = Complex(re * x, im * x)
-  def *(x: Complex): Complex = Complex(re * x.re - im * x.im, re * x.im + im * x.re)
-  def /(x: Double):  Complex = Complex(re / x, im / x)
+  infix def eq(x: Complex): Boolean = re == x.re && im == x.im
+  infix def approx(x: Complex, ep: Double = 1E-12): Boolean = abs(re - x.re) <= ep && abs(im - x.im) <= ep
+  infix def +(x: Complex): Complex = Complex(re + x.re, im + x.im)
+  infix def -(x: Complex): Complex = Complex(re - x.re, im - x.im)
+  infix def *(x: Double):  Complex = Complex(re * x, im * x)
+  infix def *(x: Complex): Complex = Complex(re * x.re - im * x.im, re * x.im + im * x.re)
+  infix def /(x: Double):  Complex = Complex(re / x, im / x)
 
   override def toString(): String = {
     val a = "%1.3f" format re
@@ -106,7 +108,9 @@ object FFTTest {
                 (0,0)).map(Complex.apply.tupled)
 
     println(fft(data))
-    println(rfft(fft(data)))
+    val timeDomainSignal = rfft(fft(data))
+    println(timeDomainSignal)
+    assert(timeDomainSignal.zip(data).forall { case (a, b) => a approx b })
 
     // sine wave tests, note this needs better windowing to be more accurate. Todo
     val sampleRate = 40000
@@ -121,7 +125,7 @@ object FFTTest {
 
     val trailFreqs = Seq(1100.0, 700.0, 1400.0, 1600, 250.0, 925.0)
     trailFreqs.map { freq =>
-      val rawWf = ws.mkSineWave(freq, 2000 * windowLen / sampleRate)
+      val rawWf = ws.mkSineWave(freq, windowLenMs * 2)
       println(s"freq: $freq, wave sample len = " + rawWf.length)
       val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(rawWf))))
       val diff = freq - maxFreqVal.freq
