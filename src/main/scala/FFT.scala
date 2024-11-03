@@ -38,7 +38,7 @@ object FFT {
     else {
       val n = cs.length
       assume(n % 2 == 0, s"The Cooley-Tukey FFT algorithm only works when the length of the input is even. $n")
-        
+
       val evenOddPairs = cs.grouped(2).toSeq
       val evens = _fft(evenOddPairs map (_(0)), direction, scalar)
       val odds  = _fft(evenOddPairs map (_(1)), direction, scalar)
@@ -61,16 +61,45 @@ object FFT {
     _fft(cSeq, Complex(0, -2), 2)
 }
 
+case class FFT(sampleRate: Int, windowLen: Int) {
+  import Audio._
+  val ws = WaveSynth(sampleRate, 8)
+  import ws._
+  val windowLenMs = 1000 * windowLen / sampleRate
+  val binSizeHz = (sampleRate/2.0) / (windowLen/2)
+  println(s"FFT binSizeHz: $binSizeHz Hz")
+  lazy val defaultWindowEs = EnvelopeSpecPercent(5.0, 0.0, 1.0, 5.0) // unsure what this should be, but this is a start
+
+  def binFreq(binIdx: Int) =
+    binIdx * binSizeHz
+  def windowed(rawWf: Array[Byte], windowEnvSpec: EnvelopeSpecPercent = defaultWindowEs): Array[Byte] = {
+    val wf = rawWf.take(windowLen)
+    ws.mult(wf, ws.basicEg.mkEg(windowEnvSpec, windowLenMs))
+  }
+  def complexify(wf: Array[Byte]): Seq[Complex] =
+    wf.toSeq.map(re => Complex(re, 0))
+  // will return the non-imaged freq bins with the frequency they represent in _1
+  def doFft(wf: Seq[Complex]) =
+    FFT.fft(wf).take(windowLen/2).zipWithIndex.map { case (c, i) => (binFreq(i), c.re) }
+  def maxAmplitudeFreq(freqBins: Seq[(Double, Double)]) = {
+    freqBins.reduce { case (a @ (f1, re1), b @ (f2, re2)) => 
+      if (abs(re1) > abs(re2)) a else b
+    }
+  }
+}
+
 object FFTTest {
   import FFT._
   import Audio._
   import Math._
   @main def run() = {
+
+    // basic checks
     val data = Seq(
                 (1,0),
                 (1,0),
                 (1,0),
-                (1,0), 
+                (1,0),
                 (0,0),
                 (0,2),
                 (0,0),
@@ -79,28 +108,25 @@ object FFTTest {
     println(fft(data))
     println(rfft(fft(data)))
 
-    // try a sine wave, note this needs proper windowing to be more accurate. Todo
+    // sine wave tests, note this needs better windowing to be more accurate. Todo
     val sampleRate = 40000
     val ws = WaveSynth(sampleRate, 8)
-    val eg = ws.basicEg
     import ws._
     val windowLen = 2048
-    val windowLenMs = 1000 * windowLen / sampleRate
-    val binSizeHz = (sampleRate/2) / (windowLen/2)
-    println(s"FFT binSizeHz: $binSizeHz Hz")
-    def binFreq(binIdx: Int) = binIdx * binSizeHz
+    val ffter = FFT(sampleRate, windowLen)
+    import ffter._
 
-    val freq = 1100.0
+    val windowLenMs = 1000 * windowLen / sampleRate
     println(s"windowLenMs: $windowLenMs Ms")
-    val rawWf = ws.mkSineWave(freq, 2000 * windowLen / sampleRate)
-    println("wave sample len = " + rawWf.length)
-    val wf = rawWf.take(windowLen)
-    val windowWf = ws.mult(wf, eg.mkEg(EnvelopeSpecPercent(5.0, 0.0, 1.0, 5.0), windowLenMs))
-    val cs = windowWf.toSeq.map(re => Complex(re, 0))
-    val rs = FFT.fft(cs).take(windowLen/2).zipWithIndex.map { case (c, i) => (binFreq(i), c.re) }
-    val maxVal = rs.reduce { case (a @ (f1, re1), b @ (f2, re2)) => 
-      if (abs(re1) > abs(re2)) a else b
+
+    val trailFreqs = Seq(1100.0, 700.0, 1400.0, 1600, 250.0, 925.0)
+    trailFreqs.map { freq =>
+      val rawWf = ws.mkSineWave(freq, 2000 * windowLen / sampleRate)
+      println(s"freq: $freq, wave sample len = " + rawWf.length)
+      val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(rawWf))))
+      val diff = freq - maxFreqVal._1
+      println(s"freq: ${freq}Hz, max: ${maxFreqVal._1}Hz, difference: ${diff}Hz, binSize: ${binSizeHz}Hz")
+      maxFreqVal
     }
-    println(s"max: ${maxVal._1} Hz ")
   }
 }
