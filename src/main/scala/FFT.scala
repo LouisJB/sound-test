@@ -123,18 +123,20 @@ object FFTTest {
     val windowLenMs = 1000 * windowLen / sampleRate
     println(s"windowLenMs: $windowLenMs Ms")
 
-    val trailFreqs = Seq(1100.0, 700.0, 1400.0, 1600, 250.0, 925.0)
+    val trailFreqs = (10 to 3000).by(100).map(_.toDouble)
     trailFreqs.map { freq =>
       val rawWf = ws.mkSineWave(freq, windowLenMs * 2)
       println(s"freq: $freq, wave sample len = " + rawWf.length)
       val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(rawWf))))
       val diff = freq - maxFreqVal.freq
       println(s"freq: ${freq}Hz, max: ${maxFreqVal.freq}Hz, difference: ${diff}Hz, binSize: ${binSizeHz}Hz")
+      assert(diff <= binSizeHz)
       maxFreqVal
     }
 
     val dcWf = Array.tabulate(windowLen)(_ => 255.toByte)
     val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(dcWf))))
     println(s"DC signal found max: ${maxFreqVal.freq}Hz")
+    assert(maxFreqVal.freq == 0.0)
   }
 }
