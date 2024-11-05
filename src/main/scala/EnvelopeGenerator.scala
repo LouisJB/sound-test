@@ -33,9 +33,9 @@ case class EG(sampleRate: Int) {
     debug(s"sustain len: $sustainLen")
     debug(s"release len: $releaseLen")
     (0 until attackLen).map(x => (x / attackLen.toDouble)).toArray ++
-    (0 until decayLen).map(x => 1.0 - (x * sustainLevel / decayLen.toDouble)) ++
+    (0 until decayLen).map(x => 1.0 - (x * (1.0 - sustainLevel) / decayLen.toDouble)) ++
     (0 until sustainLen).map(_ => sustainLevel) ++
-    (0 until releaseLen).map(x => sustainLevel - (x * (1.0 - sustainLevel) / releaseLen))
+    (0 until releaseLen).map(x => sustainLevel - (x * sustainLevel) / releaseLen)
   }
   def mkEg(es: EnvelopeSpec, durationMs: Double): Array[Double] = {
     val sampleLen = durationMs * sampleRate / 1000 
@@ -62,10 +62,21 @@ case class EG(sampleRate: Int) {
 }
 
 object EG {
+  val eg = EG(100)
   def main(args: Array[String]): Unit = {
+    doEgPercent()
+    doEg()
+  }
+  def doEgPercent() = {
+    println("Eg percent")
     val es = EnvelopeSpecPercent(10.0, 10.0, .5, 10.0)
-    val eg = EG(100)
     val egSignal = eg.mkEg(es, 1000)
-    println(egSignal.mkString)
+    println(egSignal.mkString(", "))
+  }
+  def doEg() = {
+    println("Eg")
+    val es = EnvelopeSpec(500.0, 250.0, .7, 250.0)
+    val egSignal = eg.mkEg(es, 2000)
+    println(egSignal.mkString(", "))
   }
 }

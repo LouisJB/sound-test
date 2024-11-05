@@ -74,11 +74,11 @@ case class FFT(sampleRate: Int, windowLen: Int) {
 
   def binFreq(binIdx: Int) =
     binIdx * binSizeHz
-  def windowed(rawWf: Array[Byte], windowEnvSpec: EnvelopeSpecPercent = defaultWindowEs): Array[Byte] = {
+  def windowed(rawWf: Array[Double], windowEnvSpec: EnvelopeSpecPercent = defaultWindowEs): Array[Double] = {
     val wf = rawWf.take(windowLen)
     ws.mult(wf, ws.basicEg.mkEg(windowEnvSpec, windowLenMs))
   }
-  def complexify(wf: Array[Byte]): Seq[Complex] =
+  def complexify(wf: Array[Double]): Seq[Complex] =
     wf.toSeq.map(re => Complex(re, 0))
   // will return the non-imaged freq bins with the frequency they represent in _1
   def doFft(wf: Seq[Complex]) =
@@ -114,7 +114,8 @@ object FFTTest {
 
     // sine wave tests, note this needs better windowing to be more accurate. Todo
     val sampleRate = 40000
-    val ws = WaveSynth(sampleRate, 8)
+    val bitDepth = 8
+    val ws = WaveSynth(sampleRate, bitDepth)
     import ws._
     val windowLen = 2048
     val ffter = FFT(sampleRate, windowLen)
@@ -134,7 +135,7 @@ object FFTTest {
       maxFreqVal
     }
 
-    val dcWf = Array.tabulate(windowLen)(_ => 255.toByte)
+    val dcWf = Array.tabulate(windowLen)(_ => pow(2.0, bitDepth) - 1.0)
     val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(dcWf))))
     println(s"DC signal found max: ${maxFreqVal.freq}Hz")
     assert(maxFreqVal.freq == 0.0)

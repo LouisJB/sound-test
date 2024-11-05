@@ -40,30 +40,49 @@ object SynthDemo {
       else {
         val eg = ws.basicEg
 
+        play {
+          val lenMs = 2500
+          val es = EnvelopeSpec(1000.0, 500.0, .4, 500.0)
+          val egSignal = eg.mkEg(es, lenMs)
+          ws.applyEg(egSignal)(ws.mkSineWave(1200, lenMs))
+        }
+        silence(1000)
+
+        // example simple mixing
+        play {
+          val lenMs = 2000
+          val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(500.0, 250.0, .7, 250.0), lenMs))
+          applyEg(SimpleMixer.mix(Array(
+            Tone(ws.mkSineWave(500, lenMs), 1.0),
+            Tone(ws.mkSineWave(1000, lenMs), 1.0),
+            Tone(ws.mkSineWave(2000, lenMs), 1.0)
+          )))
+        }
+        silence(1000)
+
         // example multi-tone partial mixing with EG amplitude moduation
         play {
           val lenMs = 5000
-          val egSignal = eg.mkEg(EnvelopeSpec(750.0, 250.0, .7, 250.0), lenMs)
-          ws.mult(SimpleMixer.mix(Array(
+          val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(750.0, 250.0, .7, 250.0), lenMs))
+          applyEg(SimpleMixer.mix(Array(
             Tone(ws.modulate(ws.mkTriWave(1000, lenMs), ws.mkSineWave(5, lenMs)), 0.7),
             Tone(ws.mkSquareWave(2000, lenMs), 0.5),
             Tone(ws.mkSineWave(500, lenMs), 1.0),
             Tone(ws.mkPwmWave(4000, 10, lenMs), 0.5),
             Tone(ws.mult(ws.mkNoiseWave(lenMs), eg.mkEg(EnvelopeSpec(lenMs/2, lenMs/2, .0, .0), lenMs)), 0.6)
-          )), egSignal)
+          )))
         }
+        silence(1000)
 
         // EG example
         val lenMs = 2500
         play {
           val es = EnvelopeSpec(1000.0, 500.0, .4, 500.0)
-          val egSignal = eg.mkEg(es, lenMs)
-          ws.mult(ws.mkSineWave(1200, lenMs), egSignal)
+          ws.applyEg(eg.mkEg(es, lenMs))(ws.mkSineWave(1200, lenMs))
         }
         play {
           val es = EnvelopeSpecPercent(30.0, 20.0, .4, 20.0)
-          val egSignal = eg.mkEg(es, lenMs)
-          ws.mult(ws.mkSineWave(1000, lenMs), egSignal)
+          ws.applyEg(eg.mkEg(es, lenMs))(ws.mkSineWave(1000, lenMs))
         }
 
         // example modulate 1 wave by another
@@ -76,7 +95,7 @@ object SynthDemo {
 
         (1 to 99).foreach ( p =>
           play(ws.mkPwmWave(440, p, 100).zip(
-            ws.mkPwmWave(880 * 1.5, (p + 50) % 99, 100)).map { case (a, b) => (a.toDouble + b.toDouble / 2.0).toByte }
+            ws.mkPwmWave(880 * 1.5, (p + 50) % 99, 100)).map { case (a, b) => (a + b) / 2.0 }
           )
         )
 
