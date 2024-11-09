@@ -1,4 +1,4 @@
-package FFT
+package dsp.fft
 
 import scala.math._
 
@@ -90,54 +90,28 @@ case class FFT(sampleRate: Int, windowLen: Int) {
   }
 }
 
-object FFTTest {
-  import FFT._
-  import Audio._
-  import Math._
-  @main def run() = {
-
-    // basic checks
-    val data = Seq(
-                (1,0),
-                (1,0),
-                (1,0),
-                (1,0),
-                (0,0),
-                (0,2),
-                (0,0),
-                (0,0)).map(Complex.apply.tupled)
-
-    println(fft(data))
-    val timeDomainSignal = rfft(fft(data))
-    println(timeDomainSignal)
-    assert(timeDomainSignal.zip(data).forall { case (a, b) => a approx b })
-
-    // sine wave tests, note this needs better windowing to be more accurate. Todo
-    val sampleRate = 40000
-    val bitDepth = 8
-    val ws = WaveSynth(sampleRate, bitDepth)
-    import ws._
-    val windowLen = 2048
-    val ffter = FFT(sampleRate, windowLen)
-    import ffter._
-
-    val windowLenMs = 1000 * windowLen / sampleRate
-    println(s"windowLenMs: $windowLenMs Ms")
-
-    val trailFreqs = (10 to 3000).by(100).map(_.toDouble)
-    trailFreqs.map { freq =>
-      val rawWf = ws.mkSineWave(freq, windowLenMs * 2)
-      println(s"freq: $freq, wave sample len = " + rawWf.length)
-      val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(rawWf))))
-      val diff = freq - maxFreqVal.freq
-      println(s"freq: ${freq}Hz, max: ${maxFreqVal.freq}Hz, difference: ${diff}Hz, binSize: ${binSizeHz}Hz")
-      assert(diff <= binSizeHz)
-      maxFreqVal
+object BasicAutoCorrelation {
+  def autoCorrelation(xs: Array[Double]): Array[Double] = {
+    val n = xs.length
+    (0 until n).toArray.map { j =>
+      (0 until n).map(i => xs(i) * xs((n + i - j) % n)).sum
     }
+  }
+}
 
-    val dcWf = Array.tabulate(windowLen)(_ => pow(2.0, bitDepth) - 1.0)
-    val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(dcWf))))
-    println(s"DC signal found max: ${maxFreqVal.freq}Hz")
-    assert(maxFreqVal.freq == 0.0)
+object ACFTest {
+  @main def runAcf() = {
+    val sampleRate = 1000 // pretend rate
+    val testData1 = Array(1.0, -81.0, 2.0, -15.0, 8.0, 2.0, -9.0, 0.0)
+    val ac1 = BasicAutoCorrelation.autoCorrelation(testData1)
+    println(s"ac1: " + ac1.mkString(", "))
+
+    val testData2 = (1 to 5).flatMap(_ => Array(-2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0, -1.0, -2.0, -3.0)).toArray
+    val ac2 = BasicAutoCorrelation.autoCorrelation(testData2)
+    println(s"ac2: " + ac2.mkString(", "))
+    val maxAc = ac2.zipWithIndex.drop(1).maxBy(_._1)
+    println(s"max AC $maxAc")
+    val freq0 = sampleRate.toDouble / maxAc._2.toDouble
+    println(s"freq0: $freq0")
   }
 }
