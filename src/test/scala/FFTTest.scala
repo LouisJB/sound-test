@@ -8,7 +8,7 @@ import flatspec.AnyFlatSpec
 import matchers._
 
 class ExampleSpec extends AnyFlatSpec with should.Matchers {
-  
+
   "FFT" should "be invertable" in {
     // basic checks
     val data = Seq(
@@ -62,5 +62,22 @@ class ExampleSpec extends AnyFlatSpec with should.Matchers {
     val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(dcWf))))
     println(s"DC signal found max: ${maxFreqVal.freq}Hz")
     assert(maxFreqVal.freq == 0.0)
+  }
+
+  "acf" should "calculate correct dominant frequency" in {
+    val sampleRate = 1000
+    val bitDepth = 8
+    val ws = WaveSynth(sampleRate, bitDepth)
+    import ws._
+    val freq = sampleRate / 20
+    val sampleLenMs = 1000 / freq
+    val rawWf = ws.mkSineWave(freq, sampleLenMs * 3)
+    import BasicAutoCorrelation._
+    val acs = autoCorrelation(rawWf)
+    val maxAc = findFirstPeak(acs)
+    //println(acs.mkString(", "))
+    println(s"max AC $maxAc")
+    val freq0 = sampleRate.toDouble / maxAc.get._2.toDouble
+    println(s"freq0: $freq0")
   }
 }

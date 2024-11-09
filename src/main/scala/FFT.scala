@@ -97,10 +97,19 @@ object BasicAutoCorrelation {
       (0 until n).map(i => xs(i) * xs((n + i - j) % n)).sum
     }
   }
+
+  // simple peak finder
+  def findFirstPeak(xs: Array[Double]): Option[(Double, Int)] = {
+     xs.toList.zipWithIndex.sliding(3, 1).toList.find {
+      case List[(Double, Int)](a, b, c) => a._1 < b._1 && c._1 < b._1
+      case _ => false
+    }
+  }.map(_.drop(1).head)
 }
 
 object ACFTest {
   @main def runAcf() = {
+    import BasicAutoCorrelation._
     val sampleRate = 1000 // pretend rate
     val testData1 = Array(1.0, -81.0, 2.0, -15.0, 8.0, 2.0, -9.0, 0.0)
     val ac1 = BasicAutoCorrelation.autoCorrelation(testData1)
@@ -109,7 +118,7 @@ object ACFTest {
     val testData2 = (1 to 5).flatMap(_ => Array(-2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 2.0, 1.0, 0.0, -1.0, -2.0, -3.0)).toArray
     val ac2 = BasicAutoCorrelation.autoCorrelation(testData2)
     println(s"ac2: " + ac2.mkString(", "))
-    val maxAc = ac2.zipWithIndex.drop(1).maxBy(_._1)
+    val maxAc = findFirstPeak(ac2).get
     println(s"max AC $maxAc")
     val freq0 = sampleRate.toDouble / maxAc._2.toDouble
     println(s"freq0: $freq0")
