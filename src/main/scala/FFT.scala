@@ -2,36 +2,7 @@ package dsp.fft
 
 import scala.math._
 
-// largely wholesale borrowed from rosettacode as a starting point
-case class Complex(re: Double, im: Double) {
-  infix def eq(x: Complex): Boolean = re == x.re && im == x.im
-  infix def approx(x: Complex, ep: Double = 1E-12): Boolean = abs(re - x.re) <= ep && abs(im - x.im) <= ep
-  infix def +(x: Complex): Complex = Complex(re + x.re, im + x.im)
-  infix def -(x: Complex): Complex = Complex(re - x.re, im - x.im)
-  infix def *(x: Double):  Complex = Complex(re * x, im * x)
-  infix def *(x: Complex): Complex = Complex(re * x.re - im * x.im, re * x.im + im * x.re)
-  infix def /(x: Double):  Complex = Complex(re / x, im / x)
-
-  override def toString(): String = {
-    val a = "%1.3f" format re
-    val b = "%1.3f" format abs(im)
-    (a, b) match {
-      case (_, "0.000") => a
-      case ("0.000", _) => b + "i"
-      case (_, _) if im > 0 => a + " + " + b + "i"
-      case (_, _) => a + " - " + b + "i"
-    }
-  }
-}
-object Complex {
-  def apply(re: Int, im: Int): Complex =
-    Complex(re.toDouble, im.toDouble)
-  def exp(c: Complex): Complex = {
-    val r = (cosh(c.re) + sinh(c.re))
-    Complex(cos(c.im), sin(c.im)) * r
-  }
-}
-case class FTTBin(freq: Double, value: Complex)
+// simple CT radix-2 FFT
 object FFT {
   import Complex._
   def _fft(cs: Seq[Complex], direction: Complex, scalar: Int): Seq[Complex] = {
@@ -94,6 +65,40 @@ case class FFT(sampleRate: Int, windowLen: Int) {
     }
   }
 }
+
+case class FTTBin(freq: Double, value: Complex) {
+  override def toString = s"frequency: $freq, amplitude value: $value"
+}
+
+case class Complex(re: Double, im: Double) {
+  infix def eq(x: Complex): Boolean = re == x.re && im == x.im
+  infix def approx(x: Complex, ep: Double = 1E-12): Boolean = abs(re - x.re) <= ep && abs(im - x.im) <= ep
+  infix def +(x: Complex): Complex = Complex(re + x.re, im + x.im)
+  infix def -(x: Complex): Complex = Complex(re - x.re, im - x.im)
+  infix def *(x: Double):  Complex = Complex(re * x, im * x)
+  infix def *(x: Complex): Complex = Complex(re * x.re - im * x.im, re * x.im + im * x.re)
+  infix def /(x: Double):  Complex = Complex(re / x, im / x)
+
+  override def toString(): String = {
+    val a = "%1.3f" format re
+    val b = "%1.3f" format abs(im)
+    (a, b) match {
+      case (_, "0.000") => a
+      case ("0.000", _) => b + "i"
+      case (_, _) if im > 0 => a + " + " + b + "i"
+      case (_, _) => a + " - " + b + "i"
+    }
+  }
+}
+object Complex {
+  def apply(re: Int, im: Int): Complex =
+    Complex(re.toDouble, im.toDouble)
+  def exp(c: Complex): Complex = {
+    val r = (cosh(c.re) + sinh(c.re))
+    Complex(cos(c.im), sin(c.im)) * r
+  }
+}
+
 
 object BasicAutoCorrelation {
   def autoCorrelation(xs: Array[Double]): Array[Double] = {

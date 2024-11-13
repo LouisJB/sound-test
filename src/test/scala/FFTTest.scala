@@ -82,7 +82,7 @@ class ExampleSpec extends AnyWordSpec with should.Matchers {
   }
 
   "acf" should {
-    "calculate correct dominant frequency" in {
+    "calculate correct fundamental frequency" in {
       val sampleRate = 1000
       val bitDepth = 8
       val ws = WaveSynth(sampleRate, bitDepth)
