@@ -61,6 +61,13 @@ object FFT {
     _fft(cSeq, Complex(0,  2), 1)
   def rfft(cSeq: Seq[Complex]): Seq[Complex] =
     _fft(cSeq, Complex(0, -2), 2)
+
+  def complexify(wf: Array[Double]): Seq[Complex] =
+    wf.toSeq.map(re => Complex(re, 0))
+  def complexify(wf: Array[Int]): Seq[Complex] =
+    complexify(wf.map(_.toDouble))
+  def complexify(wf: Array[(Double, Double)]): Seq[Complex] =
+    wf.toSeq.map { case (re, im) => Complex(re, im) }
 }
 
 case class FFT(sampleRate: Int, windowLen: Int) {
@@ -78,8 +85,6 @@ case class FFT(sampleRate: Int, windowLen: Int) {
     val wf = rawWf.take(windowLen)
     ws.mult(wf, ws.basicEg.mkEg(windowEnvSpec, windowLenMs))
   }
-  def complexify(wf: Array[Double]): Seq[Complex] =
-    wf.toSeq.map(re => Complex(re, 0))
   // will return the non-imaged freq bins with the frequency they represent in _1
   def doFft(wf: Seq[Complex]) =
     FFT.fft(wf).take(windowLen/2).zipWithIndex.map { case (c, i) => FTTBin(binFreq(i), c) }
