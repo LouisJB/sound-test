@@ -15,15 +15,23 @@ class ExampleSpec extends AnyWordSpec with should.Matchers {
   "FFT" should {
     "create basic freq analysis" in {
       Seq(
-        complexify(Array(0, 0, 0, 0)) -> complexify(Array(0.0, 0.0, 0.0, 0.0)),
-        complexify(Array(1, 1, 1, 1)) -> complexify(Array(4.0, 0.0, 0.0, 0.0)),
+        complexify(Array(0, 0, 0, 0)) -> complexify(Array(0.0, 0.0, 0.0, 0.0)), // nil case
+        complexify(Array(1, 1, 1, 1)) -> complexify(Array(4.0, 0.0, 0.0, 0.0)), // d.c case
         complexify(Array(1, 0, -1, 0)) -> complexify(Array(0.0, 2.0, 0.0, 2.0)),
         complexify(Array(-1, 0, 1, 0)) -> complexify(Array(0.0, -2.0, 0.0, -2.0)),
-        complexify(Array(0, 1, 0, -1)) -> complexify(Array((0.0, 0.0), (0.0, 2.0), (0.0, 0.0), (0.0, -2.0)))
-      ).foreach { case (xns, expectedXks) =>
+        complexify(Array(0, 1, 0, -1)) -> complexify(Array((0.0, 0.0), (0.0, 2.0), (0.0, 0.0), (0.0, -2.0))),
+        complexify(Array(1, -1, 1, -1)) -> complexify(Array((0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (0.0, 0.0))),   // nyquist cos re phase
+        complexify(Array(-1, 1, -1, 1)) -> complexify(Array((0.0, 0.0), (0.0, 0.0), (-4.0, 0.0), (0.0, 0.0))),  // nyquist cos re phase
+        complexify(Array(1, 1, 0, 0)) -> complexify(Array((2.0, 0.0), (1.0, 1.0), (0.0, 0.0), (1.0, -1.0))),
+        complexify(Array(1, 1, -1, -1)) -> complexify(Array((0.0, 0.0), (2.0, 2.0), (0.0, 0.0), (2.0, -2.0))),
+        complexify(Array(1, -1, -1, 1)) -> complexify(Array((0.0, 0.0), (2.0, -2.0), (0.0, 0.0), (2.0, +2.0))),
+        complexify(Array(1, 1, -1, -1, 1, 1, -1, -1)) -> complexify(Array((0.0, 0.0), (0.0, 0.0), (4.0, 4.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (4.0, -4.0), (0.0, 0.0))),
+      ).zipWithIndex.foreach { case ((xns, expectedXks), idx) =>
         val xks = fft(xns)
         println(xks.mkString(", "))
-        approxEq(xks, expectedXks) should be (true)
+        withClue (s"$idx: fft($xns) was:\n${xks.mkString(",")} not expected:\n${expectedXks.mkString(",")}") {
+          approxEq(xks, expectedXks) should be (true)
+        }
       }
     }
 

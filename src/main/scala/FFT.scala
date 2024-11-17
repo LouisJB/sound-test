@@ -60,8 +60,8 @@ case class FFT(sampleRate: Int, windowLen: Int) {
   def doFft(wf: Seq[Complex]) =
     FFT.fft(wf).take(windowLen/2).zipWithIndex.map { case (c, i) => FTTBin(binFreq(i), c) }
   def maxAmplitudeFreq(freqBins: Seq[FTTBin]) = {
-    freqBins.reduce { case (a @ FTTBin(f1, Complex(re1, _)), b @ FTTBin(f2, Complex(re2, _))) =>
-      if (abs(re1) > abs(re2)) a else b
+    freqBins.reduce { case (a @ FTTBin(f1, c1), b @ FTTBin(f2, c2)) =>
+      if (c1 > c2) a else b
     }
   }
 }
@@ -71,13 +71,17 @@ case class FTTBin(freq: Double, value: Complex) {
 }
 
 case class Complex(re: Double, im: Double) {
+  import Complex._
   infix def eq(x: Complex): Boolean = re == x.re && im == x.im
-  infix def approx(x: Complex, ep: Double = 1E-12): Boolean = abs(re - x.re) <= ep && abs(im - x.im) <= ep
+  infix def approx(x: Complex, ep: Double = epsilon): Boolean = abs(re - x.re) <= ep && abs(im - x.im) <= ep
   infix def +(x: Complex): Complex = Complex(re + x.re, im + x.im)
   infix def -(x: Complex): Complex = Complex(re - x.re, im - x.im)
-  infix def *(x: Double):  Complex = Complex(re * x, im * x)
+  infix def *(x: Double): Complex = Complex(re * x, im * x)
   infix def *(x: Complex): Complex = Complex(re * x.re - im * x.im, re * x.im + im * x.re)
-  infix def /(x: Double):  Complex = Complex(re / x, im / x)
+  infix def /(x: Double): Complex = Complex(re / x, im / x)
+  infix def >(other: Complex): Boolean = this.mag > other.mag
+
+  def mag = sqrt(re * re + im * im)
 
   override def toString(): String = {
     val a = "%1.3f" format re
@@ -91,6 +95,7 @@ case class Complex(re: Double, im: Double) {
   }
 }
 object Complex {
+  val epsilon = 1E-12
   def apply(re: Int, im: Int): Complex =
     Complex(re.toDouble, im.toDouble)
   def exp(c: Complex): Complex = {
@@ -98,7 +103,6 @@ object Complex {
     Complex(cos(c.im), sin(c.im)) * r
   }
 }
-
 
 object BasicAutoCorrelation {
   def autoCorrelation(xs: Array[Double]): Array[Double] = {
