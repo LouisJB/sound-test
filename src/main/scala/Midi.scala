@@ -8,6 +8,9 @@ import javax.sound.midi.Sequence
 import javax.sound.midi.ShortMessage
 import javax.sound.midi.Track
 import ShortMessage._
+import javax.sound.midi.Instrument
+import javax.sound.midi.MidiChannel
+import javax.sound.midi.Synthesizer
 
 object MidiDemo {
   def main(args: Array[String]): Unit = {
@@ -19,23 +22,65 @@ object MidiDemo {
     println("Voice Status:")
     synth.getVoiceStatus().foreach((println))
 
-    val midiChanels = synth.getChannels()
-    println("\nMIDI channels:")
-    midiChanels.foreach(println)
-    
     val instruments = synth.getDefaultSoundbank().getInstruments()
-    
-    println("\nInstruments:")
+    println("\nAll Instruments:")
     instruments.foreach(println)
-    synth.loadInstrument(instruments(90))
-    synth.loadInstrument(instruments(91))
 
-    midiChanels(1).noteOn(60, 600)
-    Thread.sleep((1000))
-    midiChanels(1).noteOff(60)
-    midiChanels(2).noteOn(62, 600)
-    Thread.sleep((1000))
-    midiChanels(1).noteOff(62)
+    showChannels(synth)
+
+    val instr1 = instruments(90)    // Pad 3 (polysynth) bank #0 preset #90
+    val instr2 = instruments(99)    // Instrument: FX 4 (atmosphere) bank #0 preset #99
+    val instr3 = instruments(102)   // FX 7 (echoes) bank #0 preset #102
+    val instr4 = instruments(116)   // Instrument: Taiko Drum bank #0 preset #116
+
+    synth.loadInstrument(instr1)
+    synth.loadInstrument(instr2)
+    synth.loadInstrument(instr3)
+    synth.loadInstrument(instr4)
+
+    val midiChanels = synth.getChannels()
+    programChange(midiChanels(0), instr1)
+    programChange(midiChanels(1), instr2)
+    programChange(midiChanels(2), instr3)
+    programChange(midiChanels(3), instr4)
+
+    showChannels(synth)
+
+    play(midiChanels(0), 60, 1000)
+    play(midiChanels(1), 62, 1000)
+    play(midiChanels(2), 65, 1000)
+    play(midiChanels(3), 60, 1000)
+
+    // play standard drum/perc sounds on GM midi chan 10
+    (35 to 70).foreach { nn =>
+      play(midiChanels(9), nn, 250)
+    }
+
+    allOff(midiChanels)
+  }
+
+  def showChannels(synth: Synthesizer) = {
+    val midiChanels = synth.getChannels()
+    println(s"\nMIDI Channels (${midiChanels.length}):")
+    midiChanels.zipWithIndex.foreach { case (c, i) =>
+      println(s"channel: $i, program: ${c.getProgram()}")
+    }
+  }
+
+  def programChange(channel: MidiChannel, instr: Instrument) =
+    channel.programChange(instr.getPatch().getBank(), instr.getPatch().getProgram())
+
+  def play(midiChanel: MidiChannel, noteNo: Int, durMs: Int, vel: Int = 600) = {
+    midiChanel.noteOn(noteNo, vel)
+    Thread.sleep((durMs))
+    midiChanel.noteOff(noteNo)
+  }
+
+  def allOff(midiChanels: Array[MidiChannel]) = {
+    midiChanels.foreach { mc =>
+      mc.allNotesOff()
+      mc.allSoundOff()
+    }
   }
 
   def loadMidi = {
