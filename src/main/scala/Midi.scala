@@ -82,15 +82,26 @@ object MidiDemo {
       mc.allSoundOff()
     }
   }
+}
 
-  def loadMidi = {
+// read and decode a midi file into events per track
+object MidiReader {
+  def main(args: Array[String]) = {
+    if (args.length == 1) {
+      val file = args(0)
+      val midiFile = new File(file)
+      readMidi(midiFile)
+    }
+  }
+
+  def readMidi(midiFile: File) = {
     val noteNamesList = Array("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 
-    val sequence = MidiSystem.getSequence(new File("test.mid"))
+    val sequence = MidiSystem.getSequence(midiFile)
     val tracks = sequence.getTracks().zipWithIndex
     tracks.foreach { case (track, trackIdx) =>
       println("Track " + trackIdx + ": size = " + track.size())
-      (0 to track.size).foreach { i =>
+      (0 until track.size).foreach { i =>
         val event = track.get(i)
         print("@" + event.getTick() + " ")
         val message = event.getMessage()
@@ -104,7 +115,8 @@ object MidiDemo {
             val noteName = noteNamesList(note)
             val velocity = sm.getData2()
             println("Note on, " + noteName + octave + " key=" + key + " velocity: " + velocity)
-          } else if (sm.getCommand() == NOTE_OFF) {
+          }
+          else if (sm.getCommand() == NOTE_OFF) {
             val key = sm.getData1()
             val octave = (key / 12)-1
             val note = key % 12

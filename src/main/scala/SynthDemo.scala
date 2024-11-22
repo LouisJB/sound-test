@@ -52,7 +52,7 @@ object SynthDemo {
         play {
           val lenMs = 2000
           val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(500.0, 250.0, .7, 250.0), lenMs))
-          applyEg(SimpleMixer.mix(Array(
+          applyEg(SimpleWaveMixer.mix(Array(
             Tone(ws.mkSineWave(500, lenMs), 1.0),
             Tone(ws.mkSineWave(1000, lenMs), 1.0),
             Tone(ws.mkSineWave(2000, lenMs), 1.0)
@@ -64,7 +64,7 @@ object SynthDemo {
         play {
           val lenMs = 5000
           val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(750.0, 250.0, .7, 250.0), lenMs))
-          applyEg(SimpleMixer.mix(Array(
+          applyEg(SimpleWaveMixer.mix(Array(
             Tone(ws.modulate(ws.mkTriWave(1000, lenMs), ws.mkSineWave(5, lenMs)), 0.7),
             Tone(ws.mkSquareWave(2000, lenMs), 0.5),
             Tone(ws.mkSineWave(500, lenMs), 1.0),
