@@ -44,17 +44,33 @@ case class Channel[T <: Double](channelNo: Int, channelName: String, volume: Byt
   override def toString() = s"Channel: Number: $channelNo, Name: $channelName"
 }
 
+trait OutputSink {
+  def write(data: Array[Byte]): Int
+  def underlyingBufferSize: Int
+}
+
+// provides no additional buffering, is pass through
+case class UnbufferedOutputSink(outputLine: SourceDataLine) extends OutputSink {
+  def write(data: Array[Byte]) =
+    outputLine.write(data, 0, data.size)
+
+  def underlyingBufferSize: Int =
+    outputLine.getBufferSize()
+}
+
 // basic tone mixer allowing for per tone volume
 // this is a very simple mono channel mixer
 // warning not thread safe, do not modify once running...
-class ChannelMixer[T <: Double](line: SourceDataLine) {
+class ChannelMixer[T <: Double](output: OutputSink) {
   private var channels = Set[Channel[T]]()
   private var running = false
   private def toByte(ds: Array[Double]): Array[Byte] = ds.map(_.toByte)
 
+  // here we mix input streams that have data but for n byte chunks
+  // to suite the underlying destination buffers
   private def runMixer(stopOnEmpty: Boolean = false) = {
     running = true
-    val bufferSize = line.getBufferSize()
+    val bufferSize = output.underlyingBufferSize
     val thread = new Thread {
       override def run = {
         println(s"starting mixer, stopOnEmpty: $stopOnEmpty")
@@ -76,7 +92,7 @@ class ChannelMixer[T <: Double](line: SourceDataLine) {
           else {
             // scale down then add
             val data = bufferVals.map(_.map(_ / channelSize).sum)
-            line.write(toByte(data), 0, data.size)
+            output.write(toByte(data))
           }
         }
         println("mixer ended")
@@ -105,7 +121,7 @@ class ChannelMixer[T <: Double](line: SourceDataLine) {
     channels += channel
   }
 
-  def addChannel(chans: Seq[Channel[T]]) = {
+  def addChannels(chans: Seq[Channel[T]]) = {
     require(running == false)
     println(s"adding ${chans.length} channels")
 
@@ -126,13 +142,16 @@ object MixerTest {
 
   def main(args: Array[String]): Unit = {
     AudioSynth.withDataLine(sampleRate, bitDepth) { sdl =>
+      // set up output sink
+      val outputSink = UnbufferedOutputSink(sdl)
+
       // set up a simple mixer
-      val mixer = ChannelMixer(sdl)
+      val mixer = ChannelMixer(outputSink)
       val channel1 = Channel[Double](1, "Sine 1", 127)
       val channel2 = Channel[Double](2, "Tri 1", 75)
       val channel3 = Channel[Double](3, "Noise", 75)
       val channel4 = Channel[Double](4, "Square 1", 50)
-      mixer.addChannel(Seq(channel1, channel2, channel3, channel4))
+      mixer.addChannels(Seq(channel1, channel2, channel3, channel4))
 
       val ws = WaveSynth(sampleRate, bitDepth)
       channel1.write(ws.mkSineWavePulse(500, 3000))
@@ -140,6 +159,7 @@ object MixerTest {
       channel3.write(ws.mkNoiseWave(1500))
       channel4.write(ws.mkSquareWave(1000, 2000))
 
+      // runAndWait will wait for mixer to end which will be automatic on stopOnEmpty=true to simplify basic use
       mixer.runAndWait(true)
     }
   }
