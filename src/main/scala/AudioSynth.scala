@@ -103,10 +103,18 @@ case class Player(as: AudioSynth) {
         silence(durMs)
       silence(gapMs)
   })
-  def playSeq(noteSeq: Seq[Notes], playF: (Double, Double) => Array[Byte]) =
+  def playSeqWs(noteSeq: Seq[Notes], playF: (Double, Double) => Array[Byte]) =
     noteSeq.foreach( _ match {
       case Note(f, durMs) =>
-        playF(f.toInt, durMs.toInt)
+        play(playF(f, durMs))
+      case Rest(durMs) =>
+        silence(durMs.toInt)
+  })
+
+  def playSeq(noteSeq: Seq[Notes], playF: (Double, Double) => Unit) =
+    noteSeq.foreach( _ match {
+      case Note(f, durMs) =>
+        playF(f, durMs)
       case Rest(durMs) =>
         silence(durMs.toInt)
   })

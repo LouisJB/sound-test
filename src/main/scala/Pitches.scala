@@ -15,6 +15,7 @@ trait Scale {
 case class ChromaticScale(baseFreq: Double = A1.freq) extends Scale {
   import Math._
   val ratio = semitoneRatio
+  // have made this 1 based as tonic is note 1 in default scale
   def freq(note: Int): Double =
     (baseFreq * pow(ratio, note-1)).toInt
 }

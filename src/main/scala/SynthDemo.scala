@@ -107,28 +107,6 @@ object SynthDemo {
         val pwm50Ab = ws.mkPwmWave(1000, 50, 1000)
         save("wav/pwm-50-1kHz.wav", pwm50Ab)
 
-        // some simple scala sequences
-        val player = Player(audioSynth)
-        import player._
-        val cs = ChromaticScale()
-        playSeqOpt(cs,
-          Array(
-            Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
-            Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
-        ),
-        200, 50)
-        playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
-
-        val bpm = Durations(100)
-        val notes = Seq(
-            Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
-            Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
-        ).map {
-          case Some(nn) =>
-            Note(cs.freq(nn), bpm.quarter)
-          case None => Rest(bpm.quarter)
-        }
-
         // play chromatic scale notes
         chromaticSweepUpDown(-13, 13, 1, 100)
         chromaticSweep(1, 13, 1, 100)
@@ -174,6 +152,66 @@ object SynthDemo {
           Thread.sleep(4000)
         }
       }
+    }
+  }
+}
+
+object BasicSequencerDemos {
+  import AudioConsts._
+  def main(args: Array[String]): Unit = {
+    AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
+      import audioSynth._
+      val eg = ws.basicEg
+
+      // some simple scala sequences
+      val player = Player(audioSynth)
+      import player._
+
+      val bpm = Durations(120)
+      val cs = ChromaticScale()
+      println("Node 1 is " + cs.freq(1))
+
+      // jingle bells for Christmas
+      val notes1 = Seq(
+        Some(8), Some(8), Some(8), None,
+        Some(8), Some(8), Some(8), None,
+        Some(8), Some(11), Some(4), Some(6), Some(8)).map {
+        case Some(nn) =>
+          Note(cs.freq(nn), bpm.quarter)
+        case None => Rest(bpm.quarter)
+      }
+      playSeq(notes1, (f, lenMs) => {
+        play {
+          println(s"Freq: $f, durMs: $lenMs")
+          // make sone kind of simple tone
+          val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(30.0, 75.0, .7, 150.0), lenMs))
+          applyEg(SimpleWaveMixer.mix(Array(
+            Tone(ws.mkSineWave(f, lenMs.toInt), 1.0),
+            Tone(ws.mkTriWave(f, lenMs.toInt), 0.7),
+            Tone(ws.mkSineWave(f*2, lenMs.toInt), 0.5),
+            Tone(ws.mkNoiseWave(lenMs.toInt), 0.05)
+          )))
+        }
+      })
+
+      val notes2 = Seq(
+        Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
+        Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
+      ).map {
+        case Some(nn) =>
+          Note(cs.freq(nn), bpm.quarter)
+        case None => Rest(bpm.quarter)
+      }
+      playSeq(notes2, (f, d) => toByte(as.ws.mkSineWave(f, d.toInt)) )
+
+      playSeqOpt(cs,
+        Array(
+          Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
+          Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
+      ),
+      200, 50)
+
+      playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
     }
   }
 }
