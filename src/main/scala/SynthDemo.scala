@@ -165,7 +165,7 @@ object BasicSequencerDemos {
       val eg = ws.basicEg
 
       // some simple scala sequence players
-      val player = Player(audioSynth)
+      val player = Sequencers(audioSynth)
       import player._
 
       // set up note generators
