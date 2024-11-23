@@ -43,7 +43,7 @@ object FFT {
 
 case class FFT(sampleRate: Int, windowLen: Int) {
   import Audio._
-  val ws = WaveSynth(sampleRate, 8)
+  val ws = WaveGen(sampleRate, 8)
   import ws._
   val windowLenMs = 1000 * windowLen / sampleRate
   val binSizeHz = (sampleRate/2.0) / (windowLen/2)

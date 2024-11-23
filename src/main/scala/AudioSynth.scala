@@ -12,15 +12,15 @@ import java.io.ByteArrayInputStream
 import java.io.File
 
 // sythesizer source that can play to supplied audio line
-case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
+case class AudioSynth(output: UnbufferedOutputSink, sampleRate: Int, bitDepth: Int) {
   println(s"Initialized audio synth to sample rate : $sampleRate, bit depth: $bitDepth")
 
-  val ws = WaveSynth(sampleRate, bitDepth)
+  import Utils._
+  val ws = WaveGen(sampleRate, bitDepth)
   import ws._
-  def toByte(ds: Array[Double]): Array[Byte] = ds.map(_.toByte)
 
-  def play(ab: Array[Double]) = line.write(toByte(ab), 0, ab.length)
-  def play(ab: Array[Byte]) = line.write(ab, 0, ab.length)
+  def play(ab: Array[Double]) = output.write(toByte(ab))
+  def play(ab: Array[Byte]) = output.write(ab)
   def save(path: String, ab : Array[Double]): Int = save(path, toByte(ab))
   def save(path: String, ab : Array[Byte]): Int = {
     // preset to mono wav for now
@@ -33,7 +33,7 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
       ab.length)
     AudioSystem.write(outStream, AudioFileFormat.Type.WAVE, outputFile)
   }
-  def drain(): Unit = line.drain()
+  def drain(): Unit = output.drain()
   def silence(lenMs: Int): Unit =
     play(mkSilence(lenMs))
   def sine(freq: Int, lenMs: Int): Unit =
@@ -89,8 +89,9 @@ case class AudioSynth(line: SourceDataLine, sampleRate: Int, bitDepth: Int) {
     chromaticSweep(minNote, maxNote, step, durMs)
     chromaticSweep(maxNote, minNote, step * -1, durMs)
   }
-  def stop() = AudioSynth.stopDataLine(line)
+  def stop() = output.stop()
 }
+
 case class Player(as: AudioSynth) {
   import as._
   def playSeq(scale: Scale, noteSeq: Array[Int], durMs: Int, gapMs: Int = 0) =
@@ -118,9 +119,20 @@ case class Player(as: AudioSynth) {
       case Rest(durMs) =>
         silence(durMs.toInt)
   })
+
+  // sequence the notes and rests into a sequence of wave clips
+  def seqMap(noteSeq: Seq[Notes], playF: (Double, Double) => Array[Double]): Seq[Array[Double]] =
+    noteSeq.map( _ match {
+      case Note(f, durMs) =>
+        playF(f, durMs)
+      case Rest(durMs) =>
+        ws.mkSilence(durMs.toInt)
+  })
 }
+
 object AudioSynth {
   println("AudioSynthi v0.1")
+
   def mkDataLine(sampleRate: Int, bitDepth: Int, bufferSize: Int = AudioConsts.defaultBufferSize): SourceDataLine  = {
     val af : AudioFormat = new AudioFormat(sampleRate.toFloat, bitDepth, 1, true, true)
     val line : SourceDataLine = AudioSystem.getSourceDataLine(af)
@@ -136,7 +148,7 @@ object AudioSynth {
     line.close()
   }
   def mkAudioSynth(sampleRate: Int, bitDepth: Int) =
-    AudioSynth(mkDataLine(sampleRate, bitDepth), sampleRate, bitDepth)
+    AudioSynth(UnbufferedOutputSink(mkDataLine(sampleRate, bitDepth)), sampleRate, bitDepth)
   def withDataLine(sampleRate: Int, bitDepth: Int)(fn: SourceDataLine => Unit): Unit = {
     val line = mkDataLine(sampleRate, bitDepth)
     fn(line)
@@ -145,7 +157,8 @@ object AudioSynth {
   def withAudioSynth(sampleRate: Int = AudioConsts.defaultSampleRate,
                      bitDepth: Int = AudioConsts.defaultBitDepth)(fn: AudioSynth => Unit): Unit = {
     withDataLine(sampleRate, bitDepth) { line =>
-      val as = AudioSynth(line, sampleRate, bitDepth)
+      val output = UnbufferedOutputSink(line)
+      val as = AudioSynth(output, sampleRate, bitDepth)
       fn(as)
     }
   }

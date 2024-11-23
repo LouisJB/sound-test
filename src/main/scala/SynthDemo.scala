@@ -157,42 +157,60 @@ object SynthDemo {
 }
 
 object BasicSequencerDemos {
+  import Utils._
   import AudioConsts._
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
       import audioSynth._
       val eg = ws.basicEg
 
-      // some simple scala sequences
+      // some simple scala sequence players
       val player = Player(audioSynth)
       import player._
 
+      // set up note generators
       val bpm = Durations(120)
       val cs = ChromaticScale()
       println("Node 1 is " + cs.freq(1))
+      val ng = NoteGen(cs, bpm)
+      import ng._
 
-      // jingle bells for Christmas
-      val notes1 = Seq(
+      // construct a wave generator based synth with amplitude Eg
+      val wsp = WaveSynthPlayer(audioSynth.output, defaultSampleRate, defaultBitDepth)
+      wsp.ws.setEnv(EnvelopeSpec(20.0, 50.0, .7, 100.0))
+      wsp.ws.addTgs(Seq(
+        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkSineWave(f/2.0, lenMs.toInt), 1.0),
+        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkSineWave(f*2, lenMs.toInt), 0.2),
+        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkSawWave(f, lenMs.toInt), 0.7),
+        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkNoiseWave(lenMs.toInt), 0.02)
+      ))
+      wsp.play(2000, 1000)
+      Thread.sleep(1000)
+
+      // Jingle Bells sequence for Christmas...
+      val notes1 = quarters(Seq(
         Some(8), Some(8), Some(8), None,
         Some(8), Some(8), Some(8), None,
-        Some(8), Some(11), Some(4), Some(6), Some(8)).map {
-        case Some(nn) =>
-          Note(cs.freq(nn), bpm.quarter)
-        case None => Rest(bpm.quarter)
-      }
-      playSeq(notes1, (f, lenMs) => {
-        play {
-          println(s"Freq: $f, durMs: $lenMs")
-          // make sone kind of simple tone
-          val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(30.0, 75.0, .7, 150.0), lenMs))
-          applyEg(SimpleWaveMixer.mix(Array(
-            Tone(ws.mkSineWave(f, lenMs.toInt), 1.0),
-            Tone(ws.mkTriWave(f, lenMs.toInt), 0.7),
-            Tone(ws.mkSineWave(f*2, lenMs.toInt), 0.5),
-            Tone(ws.mkNoiseWave(lenMs.toInt), 0.05)
-          )))
-        }
-      })
+        Some(8), Some(11), Some(4), Some(6)
+      )) ++ Seq(
+        note(8, bpm.whole)
+      ) ++ quarters(Seq(
+        Some(9), Some(9), Some(9), Some(9),
+        Some(9), Some(8), Some(8)
+      )) ++ mkNotes(Seq(
+        Some(8), Some(8)), Eigth)
+       ++ quarters(Seq(
+        Some(11), Some(11), Some(9),
+        Some(6)
+      )) ++ Seq(
+        note(4, bpm.whole)
+      )
+
+      play(seqMap(notes1, (f, lenMs) => {
+        println(s"Freq: $f, durMs: $lenMs")
+        wsp.ws.play(f, lenMs)
+      }).flatten.toArray)
+      Thread.sleep(1000)
 
       val notes2 = Seq(
         Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
@@ -202,16 +220,30 @@ object BasicSequencerDemos {
           Note(cs.freq(nn), bpm.quarter)
         case None => Rest(bpm.quarter)
       }
-      playSeq(notes2, (f, d) => toByte(as.ws.mkSineWave(f, d.toInt)) )
+      playSeq(notes2, wsp.play)
+      Thread.sleep(1000)
 
+      // these play using default built-in sine tone
       playSeqOpt(cs,
         Array(
           Some(1), None, None, Some(3), Some(5), None, None, Some(3), Some(5), None, Some(1), None, Some(5), None, None, None,
           Some(3), None, None, Some(5), Some(6), Some(6), Some(5), Some(3), Some(6), Some(6), Some(6), None, None, None, None
       ),
       200, 50)
+      Thread.sleep(1000)
 
       playSeq(cs, Array(1, 3, 2, 4, 5, 6, 3), 200)
     }
   }
+}
+
+case class NoteGen(cs: ChromaticScale, bpm: Durations) {
+  def note(nn: Int, dur: Double): Notes = Note(cs.freq(nn), dur)
+  def quarters(notes: Seq[Option[Int]]) = mkNotes(notes, Quarter)
+
+  def mkNotes(notes: Seq[Option[Int]], duration: NoteDuration) = notes.map( _ match {
+    case Some(nn) =>
+      note(nn, bpm.length(duration))
+    case None => Rest(bpm.length(duration))
+  })
 }

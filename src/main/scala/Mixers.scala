@@ -47,6 +47,8 @@ case class Channel[T <: Double](channelNo: Int, channelName: String, volume: Byt
 trait OutputSink {
   def write(data: Array[Byte]): Int
   def underlyingBufferSize: Int
+  def drain(): Unit
+  def stop(): Unit
 }
 
 // provides no additional buffering, is pass through
@@ -56,6 +58,14 @@ case class UnbufferedOutputSink(outputLine: SourceDataLine) extends OutputSink {
 
   def underlyingBufferSize: Int =
     outputLine.getBufferSize()
+
+  def drain() = outputLine.drain()
+
+  def stop() = {
+    drain()
+    outputLine.stop()
+    outputLine.close()
+  }
 }
 
 // basic tone mixer allowing for per tone volume
@@ -71,9 +81,10 @@ class ChannelMixer[T <: Double](output: OutputSink) {
   private def runMixer(stopOnEmpty: Boolean = false) = {
     running = true
     val bufferSize = output.underlyingBufferSize
+    println(s"bufferSize: $bufferSize, stopOnEmpty: $stopOnEmpty")
     val thread = new Thread {
       override def run = {
-        println(s"starting mixer, stopOnEmpty: $stopOnEmpty")
+        println(s"mixer thread started")
         val channelSize = channels.size
         println("channel size " + channelSize)
         while (running) {
@@ -153,7 +164,7 @@ object MixerTest {
       val channel4 = Channel[Double](4, "Square 1", 50)
       mixer.addChannels(Seq(channel1, channel2, channel3, channel4))
 
-      val ws = WaveSynth(sampleRate, bitDepth)
+      val ws = WaveGen(sampleRate, bitDepth)
       channel1.write(ws.mkSineWavePulse(500, 3000))
       channel2.write(ws.mkTriWave(2000, 1000))
       channel3.write(ws.mkNoiseWave(1500))

@@ -20,14 +20,27 @@ case class ChromaticScale(baseFreq: Double = A1.freq) extends Scale {
     (baseFreq * pow(ratio, note-1)).toInt
 }
 
+trait NoteDuration {
+  def beats: Double
+}
+case object Whole extends NoteDuration { val beats = 4 }
+case object Semi extends NoteDuration { val beats = 2 }
+case object Quarter extends NoteDuration { val beats = 1 }
+case object Eigth extends NoteDuration { val beats = 0.5 }
+case object Sixteenth extends NoteDuration { val beats = 0.25 }
+
 case class Durations(bpm: Double) {
+  // take base BPM as the stantard quarter note (quaver)
   val beatMs = 60 * 1000 / bpm
 
-  val whole = beatMs * 4.0
-  val semi = beatMs * 2.0
-  val quarter = beatMs
-  val eigth = beatMs / 2.0
-  val sixteeth = beatMs / 4.0
+  val whole = length(Whole)
+  val semi = length(Semi)
+  val quarter = length(Quarter)
+  val eigth = length(Eigth)
+  val sixteeth = length(Sixteenth)
+
+  def length(duration: NoteDuration) =
+    beatMs * duration.beats
 }
 
 trait Notes

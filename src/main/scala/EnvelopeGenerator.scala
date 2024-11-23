@@ -1,11 +1,24 @@
 package Audio
 
+trait EnvSpec {
+  def attackMs: Double
+  def decayMs: Double
+  def sustainLevel: Double
+  def releaseMs: Double
+}
+case object NullEnvelopeSpec extends EnvSpec {
+  val attackMs = 0.0
+  val decayMs = 0.0
+  val sustainLevel = 1.0
+  val releaseMs = 0.0
+}
+
 case class EnvelopeSpec(
   attackMs: Double,
   decayMs: Double,
   sustainLevel: Double,
   releaseMs: Double
-) {
+) extends EnvSpec {
   require(attackMs >= 0.0)
   require(decayMs >= 0.0)
   require(sustainLevel >= 0.0 && sustainLevel <= 1.0)
@@ -37,7 +50,7 @@ case class EG(sampleRate: Int) {
     (0 until sustainLen).map(_ => sustainLevel) ++
     (0 until releaseLen).map(x => sustainLevel - (x * sustainLevel) / releaseLen)
   }
-  def mkEg(es: EnvelopeSpec, durationMs: Double): Array[Double] = {
+  def mkEg(es: EnvSpec, durationMs: Double): Array[Double] = {
     val sampleLen = durationMs * sampleRate / 1000 
     def lenSamples(lenMs: Double) =
       (sampleRate * lenMs / 1000.0).toInt

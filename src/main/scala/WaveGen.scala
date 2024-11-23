@@ -11,8 +11,8 @@ object Debug {
   def debug(s: String) = if (enabled)
     println(s)
 }
-// creates waveforms in sampled PCM format
-case class WaveSynth(sampleRate: Int, bitDepth: Int) {
+// creates waveforms in sample PCM format
+case class WaveGen(sampleRate: Int, bitDepth: Int) {
   import Math._
   import Debug._
   val PiPi = Math.PI * 2.0
@@ -126,4 +126,39 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
     mult(as, scale(mod))
 
   def basicEg = EG(sampleRate)
+}
+
+case class WaveSynth(sampleRate: Int, bitDepth: Int) {
+  val wg = WaveGen(sampleRate: Int, bitDepth: Int)
+
+  private val eg = EG(sampleRate)
+  private var envSpec: EnvSpec = NullEnvelopeSpec
+  def setEnv(es: EnvSpec) = envSpec = es
+
+  private var toneGenerators = Set[(Double, Double) => Tone]()
+  def addTg(tgf: (Double, Double) => Tone) = toneGenerators += tgf
+  def addTgs(tgf: Seq[(Double, Double) => Tone]) = toneGenerators ++= tgf
+
+  def play(freq: Double, lenMs: Double) = {
+    require(toneGenerators.size > 0)
+    val applyEg = wg.applyEg(eg.mkEg(envSpec, lenMs))
+    val toneWaves = toneGenerators.map(tg => tg(freq, lenMs))
+    applyEg(SimpleWaveMixer.mix(toneWaves.toArray))
+  }
+}
+
+// Wave synth wrapper with audio output
+case class WaveSynthPlayer(output: UnbufferedOutputSink, sampleRate: Int, bitDepth: Int) {
+  println(s"Initialized wave synth player to sample rate : $sampleRate, bit depth: $bitDepth")
+
+  import Utils._
+  val ws = WaveSynth(sampleRate, bitDepth)
+  import ws._
+
+  def play(freq: Double, lenMs: Double) =
+    output.write(toByte(ws.play(freq, lenMs)))
+}
+
+object Utils {
+  def toByte(ds: Array[Double]): Array[Byte] = ds.map(_.toByte)
 }
