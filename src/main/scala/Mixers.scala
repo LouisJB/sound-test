@@ -4,16 +4,27 @@ import java.util.ArrayDeque
 import javax.sound.sampled.SourceDataLine
 
 // a simple tone partial with volume
-case class Tone(waveBuffers: Array[Double], volume: Double)
+case class Tone(
+  waveBuffer: () => Array[Double],
+  volume: Double = 1.0,
+  maybeAmpEnv: Option[() => Array[Double]] = None
+)
 
 // basic tone mixer allowing for per tone volume
-object SimpleWaveMixer {
+object SimpleToneWaveMixer {
   def mix(tones: Array[Tone]): Array[Double] = {
-    def scale(tone: Tone) =
-      tone.waveBuffers.map(_ * tone.volume)
-    tones.reduce { case (a, b) =>
-      Tone(scale(a).zipAll(scale(b), 0.0, 0.0).map { case (v1, v2) => (v1 + v2)/2.0 }, 1.0)
-    }.waveBuffers
+    def scale(tone: Tone) = { tone.maybeAmpEnv match {
+      case Some(env) =>
+        tone.waveBuffer().zipAll(env(), 0.0, 1.0).map { (a, b) => a * b }
+      case None =>
+        tone.waveBuffer()
+    }}.map( _ * tone.volume)
+
+    tones.reduce { case (a, b) => Tone(
+      () => scale(a).zipAll(scale(b), 0.0, 0.0).map {
+        case (v1, v2) => (v1 + v2) / 2.0
+      }
+    )}.waveBuffer()
   }
 }
 

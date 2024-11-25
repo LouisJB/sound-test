@@ -143,7 +143,7 @@ case class WaveSynth(sampleRate: Int, bitDepth: Int) {
     require(toneGenerators.size > 0)
     val applyEg = wg.applyEg(eg.mkEg(envSpec, lenMs))
     val toneWaves = toneGenerators.map(tg => tg(freq, lenMs))
-    applyEg(SimpleWaveMixer.mix(toneWaves.toArray))
+    applyEg(SimpleToneWaveMixer.mix(toneWaves.toArray))
   }
 }
 

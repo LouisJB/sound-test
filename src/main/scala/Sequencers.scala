@@ -38,6 +38,6 @@ case class Sequencers(as: AudioSynth) {
       case Note(f, durMs) =>
         playF(f, durMs)
       case Rest(durMs) =>
-        ws.mkSilence(durMs.toInt)
+        wg.mkSilence(durMs.toInt)
   })
 }

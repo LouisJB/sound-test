@@ -38,24 +38,24 @@ object SynthDemo {
         }
       }
       else {
-        val eg = ws.basicEg
+        val eg = wg.basicEg
 
         play {
           val lenMs = 2500
           val es = EnvelopeSpec(1000.0, 500.0, .4, 500.0)
           val egSignal = eg.mkEg(es, lenMs)
-          ws.applyEg(egSignal)(ws.mkSineWave(1200, lenMs))
+          wg.applyEg(egSignal)(wg.mkSineWave(1200, lenMs))
         }
         silence(1000)
 
         // example simple mixing
         play {
           val lenMs = 2000
-          val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(500.0, 250.0, .7, 250.0), lenMs))
-          applyEg(SimpleWaveMixer.mix(Array(
-            Tone(ws.mkSineWave(500, lenMs), 1.0),
-            Tone(ws.mkSineWave(1000, lenMs), 1.0),
-            Tone(ws.mkSineWave(2000, lenMs), 1.0)
+          val applyEg = wg.applyEg(eg.mkEg(EnvelopeSpec(500.0, 250.0, .7, 250.0), lenMs))
+          applyEg(SimpleToneWaveMixer.mix(Array(
+            Tone(() => wg.mkSineWave(500, lenMs)),
+            Tone(() => wg.mkSineWave(1000, lenMs)),
+            Tone(() => wg.mkSineWave(2000, lenMs))
           )))
         }
         silence(1000)
@@ -63,13 +63,13 @@ object SynthDemo {
         // example multi-tone partial mixing with EG amplitude moduation
         play {
           val lenMs = 5000
-          val applyEg = ws.applyEg(eg.mkEg(EnvelopeSpec(750.0, 250.0, .7, 250.0), lenMs))
-          applyEg(SimpleWaveMixer.mix(Array(
-            Tone(ws.modulate(ws.mkTriWave(1000, lenMs), ws.mkSineWave(5, lenMs)), 0.7),
-            Tone(ws.mkSquareWave(2000, lenMs), 0.5),
-            Tone(ws.mkSineWave(500, lenMs), 1.0),
-            Tone(ws.mkPwmWave(4000, 10, lenMs), 0.5),
-            Tone(ws.mult(ws.mkNoiseWave(lenMs), eg.mkEg(EnvelopeSpec(lenMs/2, lenMs/2, .0, .0), lenMs)), 0.6)
+          val applyEg = wg.applyEg(eg.mkEg(EnvelopeSpec(750.0, 250.0, .7, 250.0), lenMs))
+          applyEg(SimpleToneWaveMixer.mix(Array(
+            Tone(() => wg.modulate(wg.mkTriWave(1000, lenMs), wg.mkSineWave(5, lenMs)), 0.7),
+            Tone(() => wg.mkSquareWave(2000, lenMs), 0.5),
+            Tone(() => wg.mkSineWave(500, lenMs)),
+            Tone(() => wg.mkPwmWave(4000, 10, lenMs), 0.5),
+            Tone(() => wg.mkNoiseWave(lenMs), 0.6, Some(() => eg.mkEg(EnvelopeSpec(lenMs/2, lenMs/2, .0, .0), lenMs)))
           )))
         }
         silence(1000)
@@ -78,15 +78,15 @@ object SynthDemo {
         val lenMs = 2500
         play {
           val es = EnvelopeSpec(1000.0, 500.0, .4, 500.0)
-          ws.applyEg(eg.mkEg(es, lenMs))(ws.mkSineWave(1200, lenMs))
+          wg.applyEg(eg.mkEg(es, lenMs))(wg.mkSineWave(1200, lenMs))
         }
         play {
           val es = EnvelopeSpecPercent(30.0, 20.0, .4, 20.0)
-          ws.applyEg(eg.mkEg(es, lenMs))(ws.mkSineWave(1000, lenMs))
+          wg.applyEg(eg.mkEg(es, lenMs))(wg.mkSineWave(1000, lenMs))
         }
 
         // example modulate 1 wave by another
-        play(ws.modulate(ws.mkTriWave(1000, 2000), ws.mkSineWave(5, 2000)))
+        play(wg.modulate(wg.mkTriWave(1000, 2000), wg.mkSineWave(5, 2000)))
 
         // examples of PWM sweeping
         (1 to 99).foreach ( p =>
@@ -94,17 +94,17 @@ object SynthDemo {
         )
 
         (1 to 99).foreach ( p =>
-          play(ws.mkPwmWave(440, p, 100).zip(
-            ws.mkPwmWave(880 * 1.5, (p + 50) % 99, 100)).map { case (a, b) => (a + b) / 2.0 }
+          play(wg.mkPwmWave(440, p, 100).zip(
+            wg.mkPwmWave(880 * 1.5, (p + 50) % 99, 100)).map { case (a, b) => (a + b) / 2.0 }
           )
         )
 
         // wave gen, wave file generation and saving
-        val sineAb = ws.mkSineWave(1000, 1000)
+        val sineAb = wg.mkSineWave(1000, 1000)
         save("wav/sine-1kHz.wav", sineAb)
-        val triAb = ws.mkTriWave(1000, 1000)
+        val triAb = wg.mkTriWave(1000, 1000)
         save("wav/tri-1kHz.wav", triAb)
-        val pwm50Ab = ws.mkPwmWave(1000, 50, 1000)
+        val pwm50Ab = wg.mkPwmWave(1000, 50, 1000)
         save("wav/pwm-50-1kHz.wav", pwm50Ab)
 
         // play chromatic scale notes
@@ -162,7 +162,7 @@ object BasicSequencerDemos {
   def main(args: Array[String]): Unit = {
     AudioSynth.withAudioSynth(defaultSampleRate, defaultBitDepth) { audioSynth =>
       import audioSynth._
-      val eg = ws.basicEg
+      val eg = wg.basicEg
 
       // some simple scala sequence players
       val player = Sequencers(audioSynth)
@@ -177,12 +177,13 @@ object BasicSequencerDemos {
 
       // construct a wave generator based synth with amplitude Eg
       val wsp = WaveSynthPlayer(audioSynth.output, defaultSampleRate, defaultBitDepth)
-      wsp.ws.setEnv(EnvelopeSpec(20.0, 50.0, .7, 100.0))
+      wsp.ws.setEnv(EnvelopeSpec(5.0, 100.0, .7, 100.0))
+      val es1 = EnvelopeSpec(0.0, 50.0, .2, 250.0)
       wsp.ws.addTgs(Seq(
-        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkSineWave(f/2.0, lenMs.toInt), 1.0),
-        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkSineWave(f*2, lenMs.toInt), 0.2),
-        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkSawWave(f, lenMs.toInt), 0.7),
-        (f: Double, lenMs: Double) => Tone(wsp.ws.wg.mkNoiseWave(lenMs.toInt), 0.02)
+        (f: Double, lenMs: Double) => Tone(() => wg.mkSineWave(f/2.0, lenMs.toInt)),
+        (f: Double, lenMs: Double) => Tone(() => wg.mkSawWave(f*2, lenMs.toInt), 1.0, Some(() => eg.mkEg(es1, lenMs))),
+        (f: Double, lenMs: Double) => Tone(() => wg.mkSquareWave(f, lenMs.toInt), 0.5),
+        (f: Double, lenMs: Double) => Tone(() => wg.mkNoiseWave(lenMs.toInt), 0.1, Some(() => eg.mkEg(es1, lenMs)))
       ))
       wsp.play(2000, 1000)
       Thread.sleep(1000)

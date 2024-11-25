@@ -16,8 +16,8 @@ case class AudioSynth(output: UnbufferedOutputSink, sampleRate: Int, bitDepth: I
   println(s"Initialized audio synth to sample rate : $sampleRate, bit depth: $bitDepth")
 
   import Utils._
-  val ws = WaveGen(sampleRate, bitDepth)
-  import ws._
+  val wg = WaveGen(sampleRate, bitDepth)
+  import wg._
 
   def play(ab: Array[Double]) = output.write(toByte(ab))
   def play(ab: Array[Byte]) = output.write(ab)
