@@ -11,6 +11,7 @@ case class Tone(
 )
 
 // basic tone mixer allowing for per tone volume
+// and application of basic Amp Envelope
 object SimpleToneWaveMixer {
   def mix(tones: Array[Tone]): Array[Double] = {
     def scale(tone: Tone) = { tone.maybeAmpEnv match {

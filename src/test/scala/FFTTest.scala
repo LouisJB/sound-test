@@ -53,7 +53,25 @@ class ExampleSpec extends AnyWordSpec with should.Matchers {
       approxEq(xks, tds) should be (true)
     }
 
+    // simple case for small sampe size and full sample window
     "calculate correct dominant frequency" in {
+      val noOfSamples = 8
+      (1 `to` 3).map(_.toDouble).map { f =>
+        val samples = 0.until(noOfSamples).map ( i => sin(2 * PI * i * f / noOfSamples)).toArray
+        //println("samples:")
+        samples.foreach(println)
+        val ffter = FFT(noOfSamples, noOfSamples)
+        import ffter._
+        val fs = doFft(complexify(samples))
+        //println("Results:")
+        fs.foreach(println)
+        val maxFreqVal = maxAmplitudeFreq(fs)
+        println(s"Peak spectral signal found: ${maxFreqVal.freq}Hz")
+        assert(maxFreqVal.freq == f)
+      }
+    }
+
+    "calculate correct dominant frequency from windows samples" in {
       // sine wave tests, note this needs better windowing to be more accurate. Todo
       val sampleRate = 40000
       val bitDepth = 8
@@ -66,9 +84,9 @@ class ExampleSpec extends AnyWordSpec with should.Matchers {
       val windowLenMs = 1000 * windowLen / sampleRate
       println(s"windowLenMs: $windowLenMs Ms")
 
-      val trailFreqs = (10 to 3000).by(100).map(_.toDouble)
+      val trailFreqs = (10 `to` 3000).by(100).map(_.toDouble)
       trailFreqs.map { freq =>
-        val rawWf = ws.mkSineWave(freq, windowLenMs * 2)
+        val rawWf = wg.mkSineWave(freq, windowLenMs * 2)
         println(s"freq: $freq, wave sample len = " + rawWf.length)
         val maxFreqVal = maxAmplitudeFreq(doFft(complexify(windowed(rawWf))))
         val diff = freq - maxFreqVal.freq
@@ -97,7 +115,7 @@ class ExampleSpec extends AnyWordSpec with should.Matchers {
       import ws._
       val freq = sampleRate / 20
       val sampleLenMs = 1000 / freq
-      val rawWf = ws.mkSineWave(freq, sampleLenMs * 3)
+      val rawWf = wg.mkSineWave(freq, sampleLenMs * 3)
       import BasicAutoCorrelation._
       val acs = autoCorrelation(rawWf)
       val maxAc = findFirstPeak(acs)
