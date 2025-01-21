@@ -54,11 +54,29 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
       play(text, false)
     }
   }
+
+  def playWords(fileName: String) = {
+    val wordFile = new java.io.File(fileName)
+    println("Playing words from file " + wordFile.getAbsolutePath)
+    if (wordFile.exists) {
+      val rand = new scala.util.Random
+      val words: Seq[String] = io.Source.fromFile(wordFile).getLines().toSeq
+      while (true) {
+        val idx = rand.nextInt(words.length)
+        play(words(idx))
+        Thread.sleep(defaultTrainingWordGapMs)
+      }
+    }
+  }
+
+  def showSymbols() =
+    symbols.foreach( (s, m) => println(s"$s - $m"))
 }
 
 object Morse {
   private val defaultPitch = 700 // Hz
-  val defaultWpm = 10
+  private val defaultTrainingWordGapMs = 5000
+  private val defaultWpm = 10
 
   val dit = '.'
   val dah = '-'
@@ -102,8 +120,15 @@ object Morse {
   val zero  = "-----"
 
   val period = ".-.-.-"
+  val comma = "--..--"
+  val questionMark = "..__.."
+  val appostraphe = ".---."
+  val exclamation = "-.-.--"
+  val slash = "-..-."
 
-  val map = Map(
+  val at = ".--.-."
+
+  val symbols = Seq(
     'a' -> a,
     'b' -> b,
     'c' -> c,
@@ -142,23 +167,43 @@ object Morse {
     '9' -> nine,
     '0' -> zero,
 
-    '.' -> period
+    '.' -> period,
+    ',' -> comma,
+    '?' -> questionMark,
+    '\'' -> appostraphe,
+    '!' -> exclamation,
+    '/' -> slash,
+
+    '@' -> at
   )
+
+  val map = symbols.toMap
 }
 
-object MorseDemo {
+object MorseApp {
   val defaultSampleRate = 48000
   val defaintBitDepth = 8
+
   def main(args: Array[String]): Unit = {
+    clrScr()
+    print(Console.YELLOW + Console.REVERSED)
+    println("Morse utils")
+    print(Console.RESET)
     AudioSynth.withAudioSynth(defaultSampleRate, defaintBitDepth) { audioSynth =>
       val morse = Morse(audioSynth, wpm = 15, maybeWpmFarns = Some(10))
       if (args.length == 0)
         morse.play("cq kd2yck pse k.")
       else if (args.length == 1 && args(0) == "-r")
         morse.replMode()
+      else if (args.length >= 2 && args(0) == "-w")
+        morse.playWords(args(1))
+      else if (args.length == 1 && args(0) == "-p")
+        morse.showSymbols()
       else
         morse.play(args(0))
     }
-    println("All done, 73!")
+    println("\nAll done, 73!")
   }
+
+  def clrScr() = print("\u001b[2J")
 }
