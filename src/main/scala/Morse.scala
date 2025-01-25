@@ -125,7 +125,18 @@ object Morse {
   val appostraphe = ".---."
   val exclamation = "-.-.--"
   val slash = "-..-."
+  val openparens = "-.--."
+  val closeparens = "-.--.-"
 
+  val ampersand = ".-..."
+  val colon = "---..."
+  val semicolon = "-.-.-."
+  val equals = "-...-"
+  val plus = ".-.-."
+  val minus = "-....-"
+  val underscore = "..--.-"
+  val quotation = ".-..-."
+  val dollar = "...-..-"
   val at = ".--.-."
 
   val symbols = Seq(
@@ -173,7 +184,18 @@ object Morse {
     '\'' -> appostraphe,
     '!' -> exclamation,
     '/' -> slash,
+    '(' -> openparens,
+    ')' -> closeparens,
 
+    '&' -> ampersand,
+    ':' -> colon,
+    ';' -> semicolon,
+    '=' -> equals,
+    '+' -> plus,
+    '-' -> minus,
+    '_' -> underscore,
+    '"' -> quotation,
+    '$' -> dollar,
     '@' -> at
   )
 
