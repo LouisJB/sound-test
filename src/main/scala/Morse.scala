@@ -15,13 +15,13 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
 
   println(s"Time Unit: $tMs ms, Time Unit Farnsworth: $tFarnsMs ms\n")
 
-  def play(text: String, echo: Boolean = true) = {
-    if (echo)
+  def play(text: String, showWordFirst: Boolean = true, echo: Boolean = true) = {
+    if (showWordFirst)
       println(s"Morse: Playing text string:\n$text")
 
     val morse = text.map { _ match {
       case c if c != ' ' =>
-        print(c)
+        if (echo) print(c)
         val digits = map(c)
         digits.foreach { d => d match { 
           case '-' => 
@@ -34,12 +34,19 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
         as.silence(tLetterSpaceMs)
         digits + " "
       case ' ' =>
-        print(' ')
+        if (echo) print(' ')
         as.silence(tWordSpaceMs)
         " / "
+      case ex =>
+        println(s"Unexpected char, ignoring, was $ex with char code " + ex.toByte.toShort)
+        " ? "
       }
     }.flatten
-    println
+
+    if (!echo) println
+    if (!showWordFirst)
+      println(text)
+
     println(morse.mkString)
   }
 
@@ -63,14 +70,22 @@ case class Morse(as: AudioSynth, pitch: Int = defaultPitch, wpm: Int = defaultWp
       val words: Seq[String] = io.Source.fromFile(wordFile).getLines().toSeq
       while (true) {
         val idx = rand.nextInt(words.length)
-        play(words(idx))
-        Thread.sleep(defaultTrainingWordGapMs)
+        play(words(idx).stripLineEnd, showWordFirst = false, echo = false)
+        as.silence(5000)
       }
     }
   }
 
-  def showSymbols() =
-    symbols.foreach( (s, m) => println(s"$s - $m"))
+  def showSymbols() = {
+    println("Letters:")
+    letters.foreach( (s, m) => println(s"$s = $m"))
+    println()
+    println("Numbers:")
+    numbers.foreach( (s, m) => println(s"$s = $m"))
+    println()
+    println("Symbols:")
+    symbols.foreach( (s, m) => println(s"$s = $m"))
+  }
 }
 
 object Morse {
@@ -90,7 +105,7 @@ object Morse {
   val g = "--."
   val h = "...."
   val i = ".."
-  val j = ""
+  val j = ".---"
   val k = "-.-"
   val l = ".-.."
   val m = "--"
@@ -101,8 +116,8 @@ object Morse {
   val r = ".-."
   val s = "..."
   val t = "-"
-  val u = ".._"
-  val v = "..._"
+  val u = "..-"
+  val v = "...-"
   val w = ".--"
   val x = "-..-"
   val y = "-.--"
@@ -121,7 +136,7 @@ object Morse {
 
   val period = ".-.-.-"
   val comma = "--..--"
-  val questionMark = "..__.."
+  val questionMark = "..--.."
   val appostraphe = ".---."
   val exclamation = "-.-.--"
   val slash = "-..-."
@@ -139,7 +154,7 @@ object Morse {
   val dollar = "...-..-"
   val at = ".--.-."
 
-  val symbols = Seq(
+  val letters = Seq(
     'a' -> a,
     'b' -> b,
     'c' -> c,
@@ -165,8 +180,10 @@ object Morse {
     'w' -> w,
     'x' -> x,
     'y' -> y,
-    'z' -> z,
+    'z' -> z
+  )
 
+  val numbers = Seq(
     '1' -> one,
     '2' -> two,
     '3' -> three,
@@ -176,8 +193,10 @@ object Morse {
     '7' -> seven,
     '8' -> eight,
     '9' -> nine,
-    '0' -> zero,
+    '0' -> zero
+  )
 
+  val symbols = Seq(
     '.' -> period,
     ',' -> comma,
     '?' -> questionMark,
@@ -199,7 +218,14 @@ object Morse {
     '@' -> at
   )
 
-  val map = symbols.toMap
+  val allSymbols = letters ++ numbers ++ symbols
+  val map = {
+    require(allSymbols.length == allSymbols.map(_._1).toSet.size, "non unique symbol")
+    require(allSymbols.length == allSymbols.map(_._2).toSet.size, "non unique morse code sequence")
+    val morseSymbolSet = allSymbols.flatMap(_._2).toSet
+    require(morseSymbolSet == Set('.', '-'), "unexpected morse symbols found: " + morseSymbolSet)
+    allSymbols.toMap
+  }
 }
 
 object MorseApp {
